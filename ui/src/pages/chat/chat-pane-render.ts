@@ -518,9 +518,10 @@ export class ChatPane extends ChatPaneLayoutRender {
       onRequestUpdate: state.requestUpdate,
       onHistoryKeydown: state.handleChatInputHistoryKey,
       onSlashIntent: () => refreshChatCommands(state),
-      onSlashCommand: suggestionViewer
-        ? undefined
-        : (command) => void state.handleSendChat(command),
+      onSlashCommand:
+        suggestionViewer || catalogKey
+          ? undefined
+          : (command) => void state.handleSendChat(command),
       showNewMessages: state.chatNewMessagesBelow,
       onScrollToBottom: state.scrollToBottom,
       attachments: state.chatAttachments,

@@ -977,7 +977,9 @@ suite.define(() => {
       threadId: "thread-1",
     });
     const composer = catalogPane.locator(".agent-chat__composer-combobox > textarea");
-    await composer.fill("continue with the final checks");
+    const draft = "continue with the final checks /status";
+    await composer.fill(draft);
+    expect(await catalogPane.locator('.slash-menu[role="listbox"]').count()).toBe(0);
     await gateway.setMethodResponse("sessions.list", {
       count: 1,
       defaults: {
@@ -1011,7 +1013,7 @@ suite.define(() => {
     const sent = await gateway.waitForRequest("chat.send");
     expect(sent.params).toMatchObject({
       sessionKey: "agent:main:adopted-codex",
-      message: "continue with the final checks",
+      message: draft,
     });
     await expect
       .poll(() => new URL(page.url()).pathname)
