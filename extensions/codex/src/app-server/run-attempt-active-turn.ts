@@ -249,6 +249,7 @@ export async function activateCodexAttemptTurn(
           runMirrorIdentityPrefix: `${activeTurnId}:`,
           config: params.config,
         });
+        activeProjector.markSteeringTranscriptPersisted();
       }
       for (const item of inboundItems) {
         const recorder = item.userTurnTranscriptRecorder;
