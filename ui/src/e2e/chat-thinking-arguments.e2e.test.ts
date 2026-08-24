@@ -16,30 +16,29 @@ const VIEWPORTS = [
 ] as const;
 
 suite.define(() => {
-  it.each(["elevated", "exec"])(
-    "keeps authority-sensitive /%s text in the model message",
-    async (command) => {
-      await suite.withPage({}, async ({ page }) => {
-        const gateway = await installMockGateway(page, {
-          deferredMethods: ["chat.send"],
-        });
-
-        await page.goto(`${suite.server.baseUrl}chat`);
-        await gateway.waitForRequest("chat.startup");
-        const composer = page.locator(".agent-chat__composer-combobox textarea");
-        await composer.waitFor({ state: "visible" });
-        await expect.poll(() => composer.isEnabled()).toBe(true);
-
-        const message = `Keep this /${command}`;
-        await composer.fill(message);
-        await expect.poll(() => page.locator(".slash-menu[role='listbox']").count()).toBe(0);
-        await composer.press("Enter");
-
-        const request = await gateway.waitForRequest("chat.send");
-        expect((request.params as { message?: unknown }).message).toBe(message);
+  it.each([
+    ["elevated full", "/elevated full"],
+    ["exec gateway", "/exec gateway"],
+  ])("executes inline /%s separately from the draft", async (typedCommand, sentCommand) => {
+    await suite.withPage({}, async ({ page }) => {
+      const gateway = await installMockGateway(page, {
+        deferredMethods: ["chat.send"],
       });
-    },
-  );
+
+      await page.goto(`${suite.server.baseUrl}chat`);
+      await gateway.waitForRequest("chat.startup");
+      const composer = page.locator(".agent-chat__composer-combobox textarea");
+      await composer.waitFor({ state: "visible" });
+      await expect.poll(() => composer.isEnabled()).toBe(true);
+
+      await composer.fill(`Keep this /${typedCommand}`);
+      await composer.press("Enter");
+
+      const request = await gateway.waitForRequest("chat.send");
+      expect((request.params as { message?: unknown }).message).toBe(sentCommand);
+      await expect.poll(() => composer.inputValue()).toBe("Keep this ");
+    });
+  });
 
   it.each(VIEWPORTS)(
     "opens the active model's thinking levels above the composer ($name)",
