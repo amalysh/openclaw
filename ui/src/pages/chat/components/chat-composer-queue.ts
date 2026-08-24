@@ -101,7 +101,7 @@ function renderChatQueueItem(
 ) {
   const stateLabel = sendStateLabel(item);
   const failed = item.sendState === "failed" || item.sendState === "unconfirmed";
-  const steerMode = item.queueMode === "steer";
+  const steerMode = item.queueMode === "steer" && stateLabel === null;
   const reconnecting = item.sendState === "waiting-reconnect";
   const busy = item.sendState === "executing-command";
   const editing = props.editingId === item.id;

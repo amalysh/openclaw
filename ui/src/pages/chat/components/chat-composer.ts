@@ -56,7 +56,7 @@ export function renderChatComposer(props: ChatComposerProps) {
   const state = getChatComposerState(props.paneId);
   const canCompose = props.canSend;
   const isBusy = props.sending || props.stream !== null;
-  const canAbort = Boolean(props.canAbort && props.onAbort);
+  const canAbort = Boolean(props.connected && props.canAbort && props.onAbort);
   const hasTerminalStatus = hasTerminalRunStatus(props.runStatus);
   const showAbortableUi = canAbort && !hasTerminalStatus;
   const submittedProgress = props.queue.find((item) =>
