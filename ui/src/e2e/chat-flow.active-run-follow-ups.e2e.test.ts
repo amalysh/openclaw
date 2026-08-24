@@ -1,5 +1,8 @@
 import { expect, it } from "vitest";
-import { waitForControlUiGatewayReconnecting } from "../test-helpers/control-ui-e2e-readiness.ts";
+import {
+  waitForControlUiGatewayReady,
+  waitForControlUiGatewayReconnecting,
+} from "../test-helpers/control-ui-e2e-readiness.ts";
 import {
   chatSessionListResponse,
   createChatFlowE2eSuite,
@@ -474,6 +477,60 @@ suite.define(() => {
       expect(await rows.getByText("Waiting for current run").count()).toBe(0);
       expect(await rows.getByText("Steer", { exact: true }).count()).toBe(0);
       expect(await page.getByRole("button", { name: "Stop generating" }).count()).toBe(0);
+    } finally {
+      await suite.closeBrowserContext(context);
+    }
+  });
+
+  it("keeps a volatile in-flight follow-up retryable after reconnect", async () => {
+    const context = await suite.newBrowserContext({
+      locale: "en-US",
+      serviceWorkers: "block",
+      viewport: { height: 900, width: 1280 },
+    });
+    const page = await context.newPage();
+    const gateway = await installMockGateway(page);
+
+    try {
+      await page.goto(`${suite.server.baseUrl}chat`);
+
+      const composer = page.locator(".agent-chat__composer-combobox textarea");
+      const volatileText = "retry this uncertain follow-up";
+      await page.evaluate(() => {
+        const descriptor = Object.getOwnPropertyDescriptor(Storage.prototype, "setItem");
+        if (!descriptor) {
+          throw new Error("Storage.setItem is unavailable");
+        }
+        Object.defineProperty(Storage.prototype, "setItem", {
+          ...descriptor,
+          value(this: Storage, ...args: [string, string]) {
+            if (this === window.sessionStorage) {
+              throw new DOMException("exceeded the quota", "QuotaExceededError");
+            }
+            return Reflect.apply(descriptor.value, this, args);
+          },
+        });
+      });
+      await gateway.deferNext("chat.send");
+      await composer.fill(volatileText);
+      await page.getByRole("button", { name: "Send message" }).click();
+      await gateway.waitForRequest("chat.send");
+
+      await gateway.setOnline(false);
+      await waitForControlUiGatewayReconnecting(page);
+      await gateway.resolveDeferred("chat.send", {
+        runId: "stale-volatile-run",
+        status: "started",
+      });
+
+      const volatileRow = page.locator(".chat-queue__item", { hasText: volatileText });
+      await volatileRow.getByText("Delivery uncertain").waitFor({ timeout: 10_000 });
+
+      await expect.poll(() => gateway.getSocketCount(), { timeout: 15_000 }).toBe(2);
+      await gateway.setOnline(true);
+      await waitForControlUiGatewayReady(page);
+      await volatileRow.getByRole("button", { name: "Retry" }).waitFor({ timeout: 10_000 });
+      expect(await gateway.getRequests("chat.send")).toHaveLength(1);
     } finally {
       await suite.closeBrowserContext(context);
     }
