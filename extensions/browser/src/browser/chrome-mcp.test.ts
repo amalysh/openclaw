@@ -1317,6 +1317,34 @@ describe("chrome MCP page parsing", () => {
     ]);
   });
 
+  it.each(["linux", "darwin", "win32"] as const)(
+    "stops %s cleanup immediately once every owned process is absent",
+    async (platform) => {
+      const session = createFakeSession();
+      Object.assign(session, { processCleanup: { status: "open" } });
+      let alive = true;
+      session.client.close = vi.fn(async () => {
+        alive = false;
+      }) as typeof session.client.close;
+      const listProcesses = vi.fn(async () => (alive ? [processSnapshot(123, 1)] : []));
+      const sleep = vi.fn().mockResolvedValue(undefined);
+      setChromeMcpProcessCleanupDepsForTest({
+        platform,
+        listProcesses,
+        sleep,
+        taskkillProcessTree: async () => {
+          alive = false;
+        },
+      });
+      setChromeMcpSessionFactoryForTest(async () => session);
+
+      await ensureChromeMcpAvailable("chrome-live", undefined, { ephemeral: true });
+
+      expect(listProcesses).toHaveBeenCalledTimes(platform === "win32" ? 3 : 2);
+      expect(sleep).toHaveBeenCalledTimes(platform === "win32" ? 1 : 0);
+    },
+  );
+
   it("retains the proven root while skipping exited and reparented descendants", async () => {
     const session = createFakeSession();
     Object.assign(session, { processCleanup: { status: "open" } });
