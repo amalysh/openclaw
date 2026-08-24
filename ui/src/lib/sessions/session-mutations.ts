@@ -128,6 +128,12 @@ export function createSessionMutations(host: SessionMutationsHost) {
     }
     pendingModelPatches.delete(normalizedKey);
     setModelOverride(normalizedKey, undefined);
+    const state = host.readState();
+    if (Object.hasOwn(state.thinkingLevelOverrides, normalizedKey)) {
+      const thinkingLevelOverrides = { ...state.thinkingLevelOverrides };
+      delete thinkingLevelOverrides[normalizedKey];
+      host.publish({ ...state, thinkingLevelOverrides });
+    }
   };
 
   const reconcileConfirmedPreviousConnection = async (
@@ -182,6 +188,16 @@ export function createSessionMutations(host: SessionMutationsHost) {
       // Creation precedes canonical rows; claim placement before any event or
       // list publication can assign this key an ordinary roster position.
       host.notifyCreated(result.key);
+      if (result.thinkingLevel) {
+        const state = host.readState();
+        host.publish({
+          ...state,
+          thinkingLevelOverrides: {
+            ...state.thinkingLevelOverrides,
+            [result.key]: result.thinkingLevel,
+          },
+        });
+      }
       if (requestParams.worktree === true || Boolean(requestParams.execNode?.trim())) {
         preparedWorkSessionKeys.add(result.key.trim());
       }
@@ -727,8 +743,11 @@ export function createSessionMutations(host: SessionMutationsHost) {
       confirmedArchives.clear();
       preparedWorkSessionKeys.clear();
       const state = host.readState();
-      if (Object.keys(state.modelOverrides).length > 0) {
-        host.publish({ ...state, modelOverrides: {} });
+      if (
+        Object.keys(state.modelOverrides).length > 0 ||
+        Object.keys(state.thinkingLevelOverrides).length > 0
+      ) {
+        host.publish({ ...state, modelOverrides: {}, thinkingLevelOverrides: {} });
       }
     },
     dispose() {

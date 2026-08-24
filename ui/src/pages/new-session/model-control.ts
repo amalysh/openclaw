@@ -5,7 +5,6 @@ import type {
 import type { GatewayAgentRow, ModelCatalogEntry } from "../../api/types.ts";
 import type { ApplicationContext } from "../../app/context.ts";
 import { t } from "../../i18n/index.ts";
-import { peekChatMetadata, revalidateChatMetadata } from "../../lib/chat/chat-metadata-store.ts";
 import {
   buildQualifiedChatModelValue,
   normalizeChatModelProviderId,
@@ -20,6 +19,7 @@ import {
   type ChatModelCatalogState,
 } from "../chat/components/chat-model-controls.ts";
 import type { ChatModelPickerTargetGroup } from "../chat/components/chat-model-picker-options.ts";
+import { loadModels, peekModels } from "../chat/models.ts";
 import type { DraftCloudProfile } from "./discovery.ts";
 import type { NewSessionPreference } from "./preferences.ts";
 
@@ -244,9 +244,9 @@ export class NewSessionModelControl {
       client,
       id: requestId,
     };
-    const cached = peekChatMetadata(client, agentId);
-    if (Array.isArray(cached?.models)) {
-      this.publishMetadataCatalog(cached.models, "refreshing");
+    const cached = peekModels(client, { agentId, preparedOnly: true });
+    if (cached) {
+      this.publishMetadataCatalog(cached, "refreshing");
     } else {
       this.updateMetadataState({
         ...this.metadataState,
@@ -254,17 +254,20 @@ export class NewSessionModelControl {
       });
     }
 
-    void revalidateChatMetadata(client, agentId, {
-      startupRetryWindowMs: 60_000,
+    void loadModels(client, {
+      agentId,
+      bypassCache: true,
+      preparedOnly: true,
+      rejectOnFailure: true,
     }).then(
-      (result) => {
+      (models) => {
         // Only the request that still owns the control may publish catalog data
         // or restore preferences.
         if (this.activeMetadataRequest?.id !== requestId) {
           return;
         }
         this.activeMetadataRequest = undefined;
-        this.publishMetadataCatalog(Array.isArray(result.models) ? result.models : [], "ready");
+        this.publishMetadataCatalog(models, "ready");
       },
       () => {
         if (this.activeMetadataRequest?.id !== requestId) {

@@ -3,6 +3,7 @@ import type { GatewayBrowserClient } from "../../api/gateway.ts";
 
 export type SessionCreateOutcome = {
   key: string;
+  thinkingLevel?: string;
   initialRun:
     | { status: "idle" }
     | { status: "started"; runId?: string; messageSeq?: number }
@@ -63,11 +64,17 @@ export async function requestSessionCreate(
   if (!key) {
     throw new Error("sessions.create returned no key");
   }
+  const rawThinkingLevel = result.entry?.thinkingLevel;
+  const thinkingLevel =
+    typeof rawThinkingLevel === "string" && rawThinkingLevel.trim()
+      ? rawThinkingLevel.trim()
+      : undefined;
+  const created = { key, ...(thinkingLevel ? { thinkingLevel } : {}) };
   if (result.runStarted === true) {
     const runId = typeof result.runId === "string" ? result.runId.trim() : "";
     const messageSeq = result.messageSeq;
     return {
-      key,
+      ...created,
       initialRun: {
         status: "started",
         ...(runId ? { runId } : {}),
@@ -81,12 +88,12 @@ export async function requestSessionCreate(
     const message =
       typeof result.runError?.message === "string" ? result.runError.message.trim() : "";
     return {
-      key,
+      ...created,
       initialRun: {
         status: "rejected",
         error: message || "The session was created, but its first message could not be sent.",
       },
     };
   }
-  return { key, initialRun: { status: "idle" } };
+  return { ...created, initialRun: { status: "idle" } };
 }

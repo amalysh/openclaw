@@ -17,6 +17,15 @@ type ModelCatalogCacheEntry = {
 
 const modelCatalogCache = new WeakMap<GatewayBrowserClient, Map<string, ModelCatalogCacheEntry>>();
 
+export function peekModels(
+  client: GatewayBrowserClient,
+  opts: { agentId: string; preparedOnly?: boolean },
+): ModelCatalogEntry[] | undefined {
+  const cacheKey = `${opts.agentId.trim()}\0${opts.preparedOnly ? "prepared" : "exact"}`;
+  const cached = modelCatalogCache.get(client)?.get(cacheKey);
+  return cached && cached.expiresAt > Date.now() ? cached.models : undefined;
+}
+
 function modelCatalogCacheFor(client: GatewayBrowserClient): Map<string, ModelCatalogCacheEntry> {
   let cache = modelCatalogCache.get(client);
   if (!cache) {
@@ -30,6 +39,7 @@ export async function loadModels(
   client: GatewayBrowserClient,
   opts: {
     agentId: string;
+    bypassCache?: boolean;
     preparedOnly?: boolean;
     refresh?: boolean;
     refreshIfDue?: boolean;
@@ -39,6 +49,7 @@ export async function loadModels(
   const cache = modelCatalogCacheFor(client);
   const agentId = opts.agentId.trim();
   const rejectOnFailure = opts?.rejectOnFailure === true;
+  const bypassCache = opts.bypassCache === true;
   const cacheKey = `${agentId}\0${opts.preparedOnly ? "prepared" : "exact"}`;
   const preparedCacheKey = `${agentId}\0prepared`;
   const cached = cache.get(cacheKey);
@@ -59,7 +70,12 @@ export async function loadModels(
   ) {
     return cached.inFlight;
   }
-  if (!refresh && cached?.models && (cached.expiresAt > now || refreshCooldownActive)) {
+  if (
+    !bypassCache &&
+    !refresh &&
+    cached?.models &&
+    (cached.expiresAt > now || refreshCooldownActive)
+  ) {
     return cached.models;
   }
   if (

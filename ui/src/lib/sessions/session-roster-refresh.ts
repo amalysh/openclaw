@@ -304,12 +304,19 @@ export function createSessionRosterRefresh(host: SessionRosterRefreshHost) {
       nextResult = host.decorate(nextResult);
       host.onCanonicalList(nextResult);
       const state = host.readState();
+      const thinkingLevelOverrides = { ...state.thinkingLevelOverrides };
+      for (const row of nextResult?.sessions ?? []) {
+        if (row.thinkingLevel !== undefined) {
+          delete thinkingLevelOverrides[row.key];
+        }
+      }
       const error = host.observerError();
       host.publish(
         {
           result: nextResult,
           agentId: requestOptions.agentId?.trim() ? normalizeAgentId(requestOptions.agentId) : null,
           modelOverrides: state.modelOverrides,
+          thinkingLevelOverrides,
           loading: backgroundHydrate ? state.loading : false,
           error,
           deletedSessions: [],
