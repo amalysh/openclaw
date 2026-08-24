@@ -55,22 +55,8 @@ type CommandLike = {
   clientPresentation?: NonNullable<CommandEntry["clientPresentation"]>;
 };
 
-const INLINE_SAFE_COMMAND_KEYS = new Set([
-  "help",
-  "commands",
-  "whoami",
-  "status",
-  "think",
-  "verbose",
-  "trace",
-  "fast",
-  "reasoning",
-  "model",
-  "queue",
-]);
-
 export function executesInlineImmediately(command: SlashCommandDef): boolean {
-  return INLINE_SAFE_COMMAND_KEYS.has(command.key);
+  return command.source !== "skill";
 }
 
 const REMOTE_SLASH_IDENTIFIER_PATTERN = /^[a-z0-9][a-z0-9_-]*$/u;
@@ -546,9 +532,7 @@ export function getSlashCommandCompletions(
     ? SLASH_COMMANDS.filter(
         (command) =>
           (command.source === "skill" && command.skillModelVisible === true) ||
-          (INLINE_SAFE_COMMAND_KEYS.has(command.key) &&
-            (options.allowImmediateInlineCommands !== false ||
-              !executesInlineImmediately(command))),
+          (executesInlineImmediately(command) && options.allowImmediateInlineCommands !== false),
       )
     : SLASH_COMMANDS;
   commands = lower

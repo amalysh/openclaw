@@ -4123,12 +4123,25 @@ describe("chat slash menu accessibility", () => {
     expect(draft).toBe("Please use $weather ");
   });
 
-  it("does not offer session-changing commands in the middle of prose", () => {
-    const container = renderChatView();
+  it.each([
+    ["reset", "/reset"],
+    ["exec gateway", "/exec gateway"],
+  ])("executes inline /%s like its standalone command", (typedCommand, dispatchedCommand) => {
+    let draft = "";
+    const onDraftChange = vi.fn((next: string) => {
+      draft = next;
+    });
+    const onSend = vi.fn();
+    const onSlashCommand = vi.fn();
+    const { container } = createReactiveDraftHarness({ onDraftChange, onSend, onSlashCommand });
 
-    inputDraftAtEnd(container, "Please /reset");
+    inputDraftAtEnd(container, `Please /${typedCommand}`);
+    keydownComposer(container, "Enter");
 
-    expect(container.querySelector(".slash-menu")).toBeNull();
+    expect(onSlashCommand).toHaveBeenCalledExactlyOnceWith(dispatchedCommand);
+    expect(draft).toBe("Please ");
+    expect(container.querySelector<HTMLTextAreaElement>("textarea")?.value).toBe(draft);
+    expect(onSend).not.toHaveBeenCalled();
   });
 
   it("hydrates the skill catalog once per active $ reference", async () => {

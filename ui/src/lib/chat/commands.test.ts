@@ -56,7 +56,7 @@ describe("findInlineSlashCompletion", () => {
     expect(findInlineSlashCompletion("Use //wea")).toBeNull();
   });
 
-  it("limits inline suggestions to safe directives and visible skills", () => {
+  it("offers every non-skill command inline and can hide them when no command owner exists", () => {
     applyRemoteEntries([
       {
         name: "weather",
@@ -71,12 +71,30 @@ describe("findInlineSlashCompletion", () => {
     expect(
       getSlashCommandCompletions("weather", { inlineOnly: true }).map((entry) => entry.name),
     ).toEqual(["weather"]);
-    expect(getSlashCommandCompletions("reset", { inlineOnly: true })).toEqual([]);
-    expect(getSlashCommandCompletions("elevated", { inlineOnly: true })).toEqual([]);
-    expect(getSlashCommandCompletions("exec", { inlineOnly: true })).toEqual([]);
+    expect(
+      getSlashCommandCompletions("reset", { inlineOnly: true }).map((entry) => entry.name),
+    ).toEqual(["reset"]);
+    expect(
+      getSlashCommandCompletions("elevated", { inlineOnly: true }).map((entry) => entry.name),
+    ).toEqual(["elevated"]);
+    expect(
+      getSlashCommandCompletions("exec", { inlineOnly: true }).map((entry) => entry.name),
+    ).toContain("exec");
     expect(
       getSlashCommandCompletions("think", { inlineOnly: true }).map((entry) => entry.name),
     ).toContain("think");
+    expect(
+      getSlashCommandCompletions("reset", {
+        inlineOnly: true,
+        allowImmediateInlineCommands: false,
+      }),
+    ).toEqual([]);
+    expect(
+      getSlashCommandCompletions("weather", {
+        inlineOnly: true,
+        allowImmediateInlineCommands: false,
+      }).map((entry) => entry.name),
+    ).toEqual(["weather"]);
   });
 });
 
