@@ -155,12 +155,14 @@ export function buildQaGatewayConfig(params: {
     ]),
   ];
   const resolveModelEntry = (modelRef: string) => {
+    const agentRuntime = params.forcedRuntime ? { agentRuntime: { id: params.forcedRuntime } } : {};
     // Codex owns its app-server transport. OpenClaw provider params would make
     // the forced parity cell an authored route that Codex correctly rejects.
     if (params.forcedRuntime === "codex") {
-      return {};
+      return agentRuntime;
     }
     return {
+      ...agentRuntime,
       params: provider.resolveModelParams({
         modelRef,
         fastMode: params.fastMode,

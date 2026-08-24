@@ -287,6 +287,9 @@ describe("buildQaGatewayConfig", () => {
     expect(cfg.agents?.defaults?.models?.["openai/gpt-5.6-luna"]).toEqual({
       params: { transport: "sse", openaiWsWarmup: false, fastMode: true },
     });
+    expect(cfg.agents?.defaults?.models?.["openai/gpt-5.6-sol"]).toEqual({
+      params: { transport: "sse", openaiWsWarmup: false, fastMode: true },
+    });
   });
 
   it.each([
@@ -338,7 +341,7 @@ describe("buildQaGatewayConfig", () => {
     expect(cfg.plugins?.entries?.anthropic).toEqual({ enabled: true });
   });
 
-  it("keeps forced Codex cells free of OpenClaw request params", () => {
+  it("pins forced Codex runtime policy without OpenClaw request params", () => {
     const cfg = buildQaGatewayConfig({
       bind: "loopback",
       gatewayPort: 18789,
@@ -352,13 +355,41 @@ describe("buildQaGatewayConfig", () => {
       ...createQaChannelTransportParams(),
     });
 
-    expect(cfg.agents?.defaults?.models?.["openai/gpt-5.6-luna"]).toEqual({});
-    expect(cfg.agents?.defaults?.models?.["openai/gpt-5.4"]).toEqual({});
+    expect(cfg.agents?.defaults?.models?.["openai/gpt-5.6-luna"]).toEqual({
+      agentRuntime: { id: "codex" },
+    });
+    expect(cfg.agents?.defaults?.models?.["openai/gpt-5.4"]).toEqual({
+      agentRuntime: { id: "codex" },
+    });
     expect(cfg.agents?.entries?.qa?.fastModeDefault).toBe(true);
     expect(cfg.plugins?.allow).toContain("codex");
     expect(cfg.plugins?.entries?.codex).toEqual({
       enabled: true,
       config: { appServer: { sandbox: "workspace-write", serviceTier: "priority" } },
+    });
+  });
+
+  it("pins forced OpenClaw runtime policy while preserving request params", () => {
+    const cfg = buildQaGatewayConfig({
+      bind: "loopback",
+      gatewayPort: 18789,
+      gatewayToken: "token",
+      workspaceDir: "/tmp/qa-workspace",
+      providerMode: "live-frontier",
+      forcedRuntime: "openclaw",
+      fastMode: true,
+      primaryModel: "openai/gpt-5.6-luna",
+      alternateModel: "openai/gpt-5.4",
+      ...createQaChannelTransportParams(),
+    });
+
+    expect(cfg.agents?.defaults?.models?.["openai/gpt-5.6-luna"]).toEqual({
+      agentRuntime: { id: "openclaw" },
+      params: { transport: "sse", openaiWsWarmup: false, fastMode: true },
+    });
+    expect(cfg.agents?.defaults?.models?.["openai/gpt-5.4"]).toEqual({
+      agentRuntime: { id: "openclaw" },
+      params: { transport: "sse", openaiWsWarmup: false, fastMode: true },
     });
   });
 
@@ -425,8 +456,8 @@ describe("buildQaGatewayConfig", () => {
     });
     expect(cfg.plugins?.entries?.openai).toEqual({ enabled: true });
     expect(cfg.agents?.defaults?.models).toEqual({
-      "openai/gpt-5.6-luna": {},
-      "openai/gpt-5.6-luna-alt": {},
+      "openai/gpt-5.6-luna": { agentRuntime: { id: "codex" } },
+      "openai/gpt-5.6-luna-alt": { agentRuntime: { id: "codex" } },
     });
   });
 
