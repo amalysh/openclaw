@@ -4,11 +4,6 @@ import type { AgentRunRequest } from "../../gateway/server-methods/agent-request
 const RESTART_RECOVERY_EXECUTION_START_TIMEOUT_MS = 10_000;
 const RESTART_RECOVERY_ABORT_TIMEOUT_MS = 2_000;
 
-type RestartRecoveryDispatchResult = {
-  runId: string;
-  status?: unknown;
-};
-
 type RestartRecoveryDispatchObservation = {
   dispatchAccepted: boolean;
   executionStarted: boolean;
@@ -24,7 +19,7 @@ export type RestartRecoveryDispatchStartOutcome =
   | {
       kind: "terminal";
       observation: RestartRecoveryDispatchObservation;
-      result: RestartRecoveryDispatchResult;
+      result: { status?: unknown };
     }
   | {
       kind: "failed";
@@ -99,9 +94,9 @@ export async function dispatchRestartRecoveryUntilStarted(params: {
     }
   }, RESTART_RECOVERY_EXECUTION_START_TIMEOUT_MS);
   executionStartTimer.unref?.();
-  let dispatchPromise: Promise<RestartRecoveryDispatchResult>;
+  let dispatchPromise: Promise<{ status?: unknown }>;
   try {
-    dispatchPromise = params.gatewayRuntime.dispatchAgent<RestartRecoveryDispatchResult>(
+    dispatchPromise = params.gatewayRuntime.dispatchAgent<{ status?: unknown }>(
       params.agentParams,
       undefined,
       {

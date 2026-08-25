@@ -141,7 +141,7 @@ describe("main session recovery terminal-only residue", () => {
           resumedSessionKeys: new Set(),
           storePath,
         }),
-      ).resolves.toEqual({ recovered: 0, failed: 0, skipped: 1 });
+      ).resolves.toEqual({ started: 0, recovered: 0, failed: 0, skipped: 1 });
 
       const entry = loadSessionEntry({ readConsistency: "latest", sessionKey, storePath });
       expect(entry?.mainRestartRecovery).toBeUndefined();

@@ -283,7 +283,7 @@ async function settleAcceptedRestartRecovery(params: {
   return true;
 }
 
-type MainSessionResumeResult = "resumed" | "skipped" | "failed";
+type MainSessionResumeResult = "started" | "resumed" | "skipped" | "failed";
 
 async function rollbackRestartRecoveryReservation(params: {
   kind: "abandon_reservation" | "cancel_reservation";
@@ -572,10 +572,6 @@ export async function resumeMainSession(params: {
     if (dispatchOutcome.kind === "failed") {
       throw dispatchOutcome.error;
     }
-    const dispatchResult =
-      dispatchOutcome.kind === "terminal"
-        ? dispatchOutcome.result
-        : { runId: recoveryRunId, status: "accepted" };
     if (params.shouldContinue?.() === false) {
       // The accepted run belongs to its original Gateway; never let a stopped
       // owner settle or transfer that durable claim into a new lifecycle.
@@ -584,12 +580,16 @@ export async function resumeMainSession(params: {
     // Real Gateway admission consumes the reservation before returning accepted.
     // Recovery-runtime fakes may return directly, so keep this idempotent fallback
     // to make the durable acceptance boundary explicit in focused tests too.
-    let terminalStatus = normalizeRestartRecoveryTerminalStatus(dispatchResult.status);
+    let terminalStatus =
+      dispatchOutcome.kind === "terminal"
+        ? normalizeRestartRecoveryTerminalStatus(dispatchOutcome.result.status)
+        : undefined;
     if (
       !executionStarted &&
       !terminalStatus &&
       reusingRecoveryRunId &&
-      dispatchResult.status === "accepted"
+      dispatchOutcome.kind === "terminal" &&
+      dispatchOutcome.result.status === "accepted"
     ) {
       terminalStatus = await probeRestartRecoveryTerminalStatus(
         recoveryRunId,
@@ -621,6 +621,18 @@ export async function resumeMainSession(params: {
     }
     if (params.shouldContinue?.() === false) {
       return "skipped";
+    }
+    if (dispatchOutcome.kind === "started") {
+      log.info(
+        `started interrupted main session recovery: ${params.sessionKey}${
+          sanitizedPendingText ? " (with pending payload)" : ""
+        }`,
+      );
+      return "started";
+    }
+    if (terminalStatus !== "ok") {
+      log.warn(`restart recovery ended with ${terminalStatus}: ${params.sessionKey}`);
+      return "failed";
     }
     log.info(
       `resumed interrupted main session: ${params.sessionKey}${
@@ -671,8 +683,8 @@ export async function resumeMainSession(params: {
           if (!settled) {
             log.warn(`restart recovery admission changed before settlement: ${params.sessionKey}`);
           } else if (params.shouldContinue?.() !== false) {
-            log.info(`settled completed restart recovery for ${params.sessionKey}`);
-            return "resumed";
+            log.info(`settled ${terminalStatus} restart recovery for ${params.sessionKey}`);
+            return terminalStatus === "ok" ? "resumed" : "failed";
           }
         }
       }

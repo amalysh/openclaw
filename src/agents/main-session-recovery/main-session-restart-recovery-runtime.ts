@@ -27,7 +27,7 @@ import {
   recoverStore,
 } from "./main-session-restart-recovery-store.js";
 
-type RecoveryCounts = { recovered: number; failed: number; skipped: number };
+type RecoveryCounts = { started: number; recovered: number; failed: number; skipped: number };
 
 async function runRecoveryRetries(params: {
   initialDelayMs: number;
@@ -75,7 +75,7 @@ export async function recoverRestartAbortedMainSessions(params: {
   shouldContinue?: () => boolean;
   gatewayRuntime: GatewayRecoveryRuntime;
 }): Promise<RecoveryCounts> {
-  const result = { recovered: 0, failed: 0, skipped: 0 };
+  const result = { started: 0, recovered: 0, failed: 0, skipped: 0 };
   const resumedSessionKeys = params.resumedSessionKeys ?? new Set<string>();
 
   for (const storePath of await resolveRestartRecoveryStorePaths(params)) {
@@ -94,14 +94,15 @@ export async function recoverRestartAbortedMainSessions(params: {
       shouldContinue: params.shouldContinue,
       gatewayRuntime: params.gatewayRuntime,
     });
+    result.started += storeResult.started;
     result.recovered += storeResult.recovered;
     result.failed += storeResult.failed;
     result.skipped += storeResult.skipped;
   }
 
-  if (result.recovered > 0 || result.failed > 0) {
+  if (result.started > 0 || result.recovered > 0 || result.failed > 0) {
     mainSessionRecoveryLog.info(
-      `main-session restart recovery complete: recovered=${result.recovered} failed=${result.failed} skipped=${result.skipped}`,
+      `main-session restart recovery complete: started=${result.started} recovered=${result.recovered} failed=${result.failed} skipped=${result.skipped}`,
     );
   }
   return result;
@@ -163,7 +164,7 @@ async function recoverExpectedRestartRecovery(params: {
           })
         : undefined;
   if (!loadExpected()) {
-    return { recovered: 0, failed: 0, skipped: 0 };
+    return { started: 0, recovered: 0, failed: 0, skipped: 0 };
   }
   const assertExpectedCurrent = () => {
     if (!loadExpected()) {

@@ -231,8 +231,8 @@ export async function recoverStore(params: {
   lifecycleGeneration?: string;
   shouldContinue?: () => boolean;
   gatewayRuntime: GatewayRecoveryRuntime;
-}): Promise<{ recovered: number; failed: number; skipped: number }> {
-  const result = { recovered: 0, failed: 0, skipped: 0 };
+}): Promise<{ started: number; recovered: number; failed: number; skipped: number }> {
+  const result = { started: 0, recovered: 0, failed: 0, skipped: 0 };
   const shouldContinue = () => params.shouldContinue?.() !== false;
   const stopped = () => {
     if (shouldContinue()) {
@@ -393,7 +393,10 @@ export async function recoverStore(params: {
       continue;
     }
     const recordResumeResult = (resumeResult: Awaited<ReturnType<typeof resumeMainSession>>) => {
-      if (resumeResult === "resumed") {
+      if (resumeResult === "started") {
+        params.resumedSessionKeys.add(resumeDedupeKey);
+        result.started++;
+      } else if (resumeResult === "resumed") {
         params.resumedSessionKeys.add(resumeDedupeKey);
         result.recovered++;
       } else if (resumeResult === "skipped") {
