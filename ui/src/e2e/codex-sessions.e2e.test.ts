@@ -635,7 +635,7 @@ suite.define(() => {
           (key) => JSON.parse(localStorage.getItem(key) ?? "[]"),
           collapsedSessionSectionsStorageKey,
         ),
-      ).toContain("catalog-project:codex:gateway:local:project:/Users/dev/openclaw");
+      ).toContain("catalog-project:codex:gateway:local:/Users/dev/openclaw");
 
       await openclawProject.click();
       await expect.poll(() => openclawProject.getAttribute("aria-expanded")).toBe("true");
@@ -646,7 +646,7 @@ suite.define(() => {
           (key) => JSON.parse(localStorage.getItem(key) ?? "[]"),
           collapsedSessionSectionsStorageKey,
         ),
-      ).not.toContain("catalog-project:codex:gateway:local:project:/Users/dev/openclaw");
+      ).not.toContain("catalog-project:codex:gateway:local:/Users/dev/openclaw");
 
       if (captureUiProofEnabled) {
         await mkdir(uiProofArtifactDir, { recursive: true });

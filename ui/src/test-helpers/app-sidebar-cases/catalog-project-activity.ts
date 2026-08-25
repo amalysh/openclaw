@@ -4,6 +4,49 @@ import { createGateway, createSessions, mountSidebar } from "../app-sidebar.ts";
 import "../../components/app-sidebar.ts";
 
 describe("AppSidebar project session activity", () => {
+  it("preserves collapsed project sections stored by earlier versions", async () => {
+    localStorage.setItem(
+      "openclaw:sidebar:sessions:collapsed-sections",
+      JSON.stringify(["catalog-project:codex:gateway:local:/work/openclaw"]),
+    );
+    const gateway = createGateway({} as GatewayBrowserClient);
+    const { sidebar } = await mountSidebar(gateway, createSessions("main", ["agent:main:main"]));
+    sidebar.sessionData.sessionCatalogs = [
+      {
+        id: "codex",
+        label: "Codex",
+        capabilities: { continueSession: true, archive: true },
+        hosts: [
+          {
+            hostId: "gateway:local",
+            label: "Local Codex",
+            kind: "gateway",
+            connected: true,
+            sessions: [
+              {
+                threadId: "legacy-collapsed-thread",
+                name: "Collapsed session",
+                cwd: "/work/openclaw",
+                status: "idle",
+                archived: false,
+                canContinue: true,
+                canArchive: true,
+              },
+            ],
+          },
+        ],
+      },
+    ];
+    sidebar.sessionData.requestSessionDataUpdate();
+    await sidebar.updateComplete;
+
+    const project = sidebar.querySelector<HTMLButtonElement>(
+      ".sidebar-session-catalog-project__head",
+    );
+    expect(project?.getAttribute("aria-expanded")).toBe("false");
+    expect(sidebar.querySelector('[data-session-key*="legacy-collapsed-thread"]')).toBeNull();
+  });
+
   it("preserves catalog menu focus when project groups reorder", async () => {
     const gateway = createGateway({} as GatewayBrowserClient);
     const { sidebar } = await mountSidebar(gateway, createSessions("main", ["agent:main:main"]));

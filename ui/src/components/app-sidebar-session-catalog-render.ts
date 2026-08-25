@@ -405,7 +405,7 @@ function renderCatalogHostGroup(
         ${projectGroups
           ? html`${repeat(
               projectGroups.groups,
-              (group) => group.key,
+              (group) => group.renderKey,
               (group) => {
                 const sectionId = `catalog-project:${catalog.id}:${host.hostId}:${group.key}`;
                 const collapsed = params.collapsedSections.has(sectionId);
@@ -414,7 +414,7 @@ function renderCatalogHostGroup(
                     <button
                       type="button"
                       class="sidebar-session-catalog-project__head"
-                      data-session-catalog-project=${group.key}
+                      data-session-catalog-project=${group.renderKey}
                       aria-expanded=${String(!collapsed)}
                       title=${group.title}
                       @click=${() => params.onToggleSection(sectionId)}

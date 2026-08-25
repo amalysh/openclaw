@@ -7,7 +7,10 @@ export function normalizeCatalogProjectGrouping(raw: unknown): CatalogProjectGro
 }
 
 type CatalogProjectGroup = {
+  // `key` is part of the persisted collapsed-section id. `renderKey` may add a
+  // namespace so Lit never reuses a custom group for a same-text project path.
   key: string;
+  renderKey: string;
   label: string;
   title: string;
   sessions: SessionCatalogSession[];
@@ -34,6 +37,7 @@ export function groupCatalogSessionsByProject(sessions: readonly SessionCatalogS
       if (!group) {
         group = {
           key,
+          renderKey: key,
           label: customGroup,
           title: `Custom group: ${customGroup}`,
           sessions: [],
@@ -62,7 +66,8 @@ export function groupCatalogSessionsByProject(sessions: readonly SessionCatalogS
     let group = projectGroupsByPath.get(projectPath);
     if (!group) {
       group = {
-        key: `project:${projectPath}`,
+        key: projectPath,
+        renderKey: `project:${projectPath}`,
         label: projectPath.split(/[\\/]/).at(-1) || projectPath,
         title: projectPath,
         sessions: [],
@@ -96,7 +101,7 @@ export function groupCatalogSessionsByPerson(sessions: readonly SessionCatalogSe
     let group = groupsById.get(key);
     if (!group) {
       const label = actor.label?.trim() || actor.id;
-      group = { key, label, title: `Created by ${label}`, sessions: [] };
+      group = { key, renderKey: key, label, title: `Created by ${label}`, sessions: [] };
       groupsById.set(key, group);
     }
     group.sessions.push(session);
