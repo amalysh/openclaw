@@ -347,7 +347,7 @@ describe("skill_workshop tool", () => {
     ).resolves.toMatchObject({ details: { proposals: [] } });
   });
 
-  it("durably completes a proposal review and blocks later work", async () => {
+  it("pins the default action enum and blocks work after proposal review completion", async () => {
     const workspaceDir = await tempDirs.make("openclaw-skill-workshop-review-completion-");
     let completions = 0;
     const progress: Array<{ proposalIds: string[]; remaining: number }> = [];
@@ -380,7 +380,22 @@ describe("skill_workshop tool", () => {
 
     expect(
       (tool.parameters as { properties: { action: { enum: string[] } } }).properties.action.enum,
-    ).toEqual(["create", "revise", "list", "inspect", "complete"]);
+    ).toEqual([
+      "create",
+      "patch",
+      "update",
+      "read",
+      "revise",
+      "list",
+      "inspect",
+      "evaluate",
+      "apply",
+      "reject",
+      "quarantine",
+      "history",
+      "restore_collection",
+      "complete",
+    ]);
     const create = tool.execute("call-create-before-complete", {
       action: "create",
       name: "Checkpointed Learning",

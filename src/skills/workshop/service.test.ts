@@ -253,7 +253,7 @@ describe("skill workshop proposals", () => {
   });
 
   it.runIf(process.platform !== "win32")(
-    "keeps opted-in trusted workspace skills symlink targets read-only without create provenance",
+    "allows a pending operator review for a user-authored trusted symlink skill",
     async () => {
       const workspaceDir = await makeWorkspace();
       const targetSkillsDir = await tempDirs.make("openclaw-skill-workshop-target-skills-");
@@ -273,15 +273,14 @@ describe("skill workshop proposals", () => {
           workshop: { allowSymlinkTargetWrites: true },
         },
       };
-      await expect(
-        proposeUpdateSkill({
-          workspaceDir,
-          config,
-          skillName: "shared-skill",
-          content: "# Shared Skill\n\nNew body.\n",
-          supportFiles: [{ path: "references/shared.md", content: "New support.\n" }],
-        }),
-      ).rejects.toThrow("Skill Workshop does not own this skill path: shared-skill");
+      const proposal = await proposeUpdateSkill({
+        workspaceDir,
+        config,
+        skillName: "shared-skill",
+        content: "# Shared Skill\n\nNew body.\n",
+        supportFiles: [{ path: "references/shared.md", content: "New support.\n" }],
+      });
+      expect(proposal.record).toMatchObject({ kind: "update", status: "pending" });
       await expect(fs.readFile(path.join(skillDir, "SKILL.md"), "utf8")).resolves.toContain(
         "Old body.",
       );

@@ -11,7 +11,6 @@ const PROJECTION_CAPS = {
   artifactChars: 20_000,
   collectionHistoryChars: 8_000,
   historyTranscriptChars: 80_000,
-  reviewTranscriptChars: 60_000,
 } as const;
 
 function positiveInteger(value: number | undefined): number | undefined {
@@ -41,6 +40,5 @@ export function resolveSkillWorkshopProjectionBudgets(contextTokens?: number) {
     artifactChars: Math.min(contextChars, PROJECTION_CAPS.artifactChars),
     collectionHistoryChars: Math.min(contextChars, PROJECTION_CAPS.collectionHistoryChars),
     historyTranscriptChars: Math.min(contextChars, PROJECTION_CAPS.historyTranscriptChars),
-    reviewTranscriptChars: Math.min(contextChars, PROJECTION_CAPS.reviewTranscriptChars),
   };
 }

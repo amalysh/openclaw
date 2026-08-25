@@ -125,6 +125,18 @@ export function listWorkshopOwnedSkillDirs(
   );
 }
 
+/** Skill names proven by an applied Workshop create in this workspace. */
+export function listWorkshopAuthoredSkillNames(
+  workspaceDir: string,
+  options: SkillWorkshopStoreOptions = {},
+): Set<string> {
+  return new Set(
+    [...listWorkshopOwnedSkillDirs(workspaceDir, options)].map((skillDir) =>
+      path.basename(skillDir),
+    ),
+  );
+}
+
 export function isWorkshopOwnedSkillDir(
   workspaceDir: string,
   skillDir: string,

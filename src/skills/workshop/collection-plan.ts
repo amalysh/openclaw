@@ -44,7 +44,7 @@ export function validateSkillCollectionPlan(
       currentByName.has(entry.name) &&
       !currentByName.get(entry.name)!.workshopOwned
     ) {
-      throw new Error(`Skill Workshop does not own this skill path: ${entry.name}`);
+      throw new Error(`User-authored skill must stay unchanged: ${entry.name}`);
     }
   }
   const missing = current.map((skill) => skill.name).filter((name) => !seen.has(name));

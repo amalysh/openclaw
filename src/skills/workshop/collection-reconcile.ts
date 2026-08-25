@@ -29,6 +29,7 @@ import {
   assertResultCollectionBytes,
 } from "./collection-byte-limits.js";
 import {
+  autonomousSkillSizeError,
   MAX_RECONCILED_SKILL_BYTES,
   MAX_RECONCILED_SKILLS,
   type SkillCollectionChange,
@@ -48,7 +49,7 @@ import {
   resolveSkillCollectionBackupRoot,
 } from "./collection-paths.js";
 import { validateSkillCollectionPlan } from "./collection-plan.js";
-import { recordSkillCollectionReviewSuccess } from "./collection-review-state.js";
+import { recordSkillCollectionReviewHistory } from "./collection-review-state.js";
 import {
   discardStagedSkillCollectionDrops,
   restoreSkillCollectionBackupTransaction,
@@ -189,7 +190,7 @@ export async function reconcileSkillCollection(params: {
           params.env ? { env: params.env } : {},
         );
         const result: SkillCollectionReconcileResult = { backupId, ...outcome };
-        recordSkillCollectionReviewSuccess(
+        recordSkillCollectionReviewHistory(
           workspaceDir,
           Date.now(),
           result,
@@ -324,7 +325,7 @@ export async function reconcileSkillCollection(params: {
           backupId: backup.manifest.id,
           ...outcome,
         };
-        recordSkillCollectionReviewSuccess(
+        recordSkillCollectionReviewHistory(
           workspaceDir,
           Date.now(),
           result,
@@ -511,13 +512,12 @@ async function prepareWrites(params: {
     if (!existing && (await pathExists(skillDir))) {
       throw new Error(`New skill directory already exists: ${skillDir}`);
     }
+    const currentContent = existing ? await fs.readFile(existing.filePath, "utf8") : undefined;
     const draft = prepareSkillProposalDraft({
       name: entry.name,
       description: entry.description,
       content: entry.content,
-      fallbackFrontmatterContent: existing
-        ? await fs.readFile(existing.filePath, "utf8")
-        : undefined,
+      fallbackFrontmatterContent: currentContent,
       date: new Date().toISOString(),
       maxSkillBytes: workshop.maxSkillBytes,
     });
@@ -527,12 +527,18 @@ async function prepareWrites(params: {
     if (draft.value.scan.critical > 0) {
       throw new Error(`Skill security scan rejected ${entry.name}.`);
     }
+    const resultContent = stripProposalFrontmatterForSkill(draft.value.content);
+    const currentChars = currentContent?.length ?? 0;
+    const sizeError = autonomousSkillSizeError(entry.name, currentChars, resultContent.length);
+    if (sizeError) {
+      throw new Error(sizeError);
+    }
     writes.push(
       await prepareWorkspaceSkillMutation({
         workspaceDir: params.workspaceDir,
         skillDir,
         skillFile,
-        content: stripProposalFrontmatterForSkill(draft.value.content),
+        content: resultContent,
         mode: existing ? "update" : "create",
         symlinkPolicy: {
           allowWrites: false,
