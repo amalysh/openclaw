@@ -1838,7 +1838,8 @@ export async function prepareCliRunContext(
       bindMcpClientGrantAdmission(preparedParams.admittedRunContext);
       if (!isControlOperation) {
         recordAdmittedModelRoutingDecision({
-          token: preparedParams.admittedRunContext.executionIdentityToken,
+          admittedRunContext: preparedParams.admittedRunContext,
+          abortSignal: preparedParams.abortSignal,
           requestedProvider:
             params.modelRoutingProvenance?.requestedProvider ??
             params.modelProvider ??
@@ -1947,7 +1948,8 @@ export async function prepareCliRunContext(
     });
     bindMcpClientGrantAdmission(preparedParams.admittedRunContext);
     recordAdmittedModelRoutingDecision({
-      token: preparedParams.admittedRunContext.executionIdentityToken,
+      admittedRunContext: preparedParams.admittedRunContext,
+      abortSignal: preparedParams.abortSignal,
       requestedProvider:
         params.modelRoutingProvenance?.requestedProvider ?? params.modelProvider ?? params.provider,
       requestedModel: params.modelRoutingProvenance?.requestedModel ?? params.model ?? "default",
