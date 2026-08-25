@@ -1755,7 +1755,7 @@ describe("agentLoop tool termination", () => {
       expect(events.filter((event) => event.type === "turn_end")).toEqual([
         expect.objectContaining({
           message: expect.objectContaining({ role: "assistant", stopReason: "toolUse" }),
-          toolResults: toolResults,
+          toolResults,
         }),
       ]);
     },
@@ -1823,7 +1823,9 @@ describe("agentLoop tool termination", () => {
     await firstStarted.promise;
     await secondCommitAttempted.promise;
     try {
-      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
       expect(agentEnded).toBe(false);
       expect(agent.state.isStreaming).toBe(true);
     } finally {

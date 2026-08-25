@@ -785,7 +785,14 @@ async function executeToolCallsSequential(
           skippedStartIndex = callIndex + 1;
           break;
         }
-        const executed = launches.completed[0]?.outcome ?? (await launches.started[0]!.outcome);
+        let executed = launches.completed[0]?.outcome;
+        if (!executed) {
+          const startedOutcome = launches.started[0]?.outcome;
+          if (!startedOutcome) {
+            throw new Error("Tool launch finished without an outcome");
+          }
+          executed = await startedOutcome;
+        }
         finalized = await finalizeExecutedToolCall(batch, entry, executed, entry.execution.args);
       } finally {
         entry.execution.dispose();
@@ -1142,7 +1149,7 @@ async function launchParallelToolCalls(
       finish();
       return;
     }
-    let outcome: Promise<ExecutedToolCallOutcome> | undefined;
+    const launchState: { outcome?: Promise<ExecutedToolCallOutcome> } = {};
     let started = false;
     let rejected = false;
     const onStart = () => {
@@ -1157,14 +1164,15 @@ async function launchParallelToolCalls(
         throw error;
       }
       started = true;
-      if (outcome) {
-        result.started.push({ ...current, outcome });
+      if (launchState.outcome) {
+        result.started.push({ ...current, outcome: launchState.outcome });
       }
       // Advance only from the final source-start callback so guard → commit → implementation stays
       // adjacent while started bodies overlap; pre-source completion advances below without commit.
       queueMicrotask(launchNext);
     };
-    outcome = current.entry.execution.execute(onStart);
+    const outcome = current.entry.execution.execute(onStart);
+    launchState.outcome = outcome;
     if (started) {
       result.started.push({ ...current, outcome });
     }
