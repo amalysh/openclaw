@@ -131,15 +131,16 @@ export async function resolveMSTeamsThreadContext(params: {
 
   let threadContext: string | undefined;
   // Channel activities frequently arrive without `replyToId`, so fall back to the thread
-  // root parsed from the conversation id. `attachments/graph.ts` already resolves the
-  // Graph message URL this way; without the same fallback here, parent and sibling-reply
-  // context never loads for those turns. The self-comparison keeps a top-level post from
-  // being treated as its own parent.
-  const threadParentId =
-    activity.replyToId ??
-    (conversationMessageId && conversationMessageId !== activity.id
-      ? conversationMessageId
-      : undefined);
+  // root carried in the conversation id; without it, parent and sibling-reply context
+  // never loads for those turns.
+  //
+  // The conversation root takes precedence, matching `resolveMSTeamsRouteSessionKey` and
+  // `attachments/graph.ts`, which both read `conversationMessageId` ahead of `replyToId`.
+  // Preferring `replyToId` here would make a deep reply fetch context beneath the nested
+  // reply while the session routes to the root, splitting the two. `replyToId` stays as
+  // the fallback for activities whose conversation id carries no thread suffix.
+  const threadRootId = conversationMessageId ?? activity.replyToId;
+  const threadParentId = threadRootId && threadRootId !== activity.id ? threadRootId : undefined;
   if (threadParentId && params.isChannel && teamAadGroupId) {
     try {
       const graphToken = await withMSTeamsRequestDeadline({
