@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { prepareSystemAgentRunAdmission } from "../../agents/admitted-run-context.js";
+import { runOutsidePreparedModelRuntimePluginGenerationScope } from "../../agents/prepared-model-runtime-generation-scope.js";
 import { SessionManager } from "../../agents/sessions/index.js";
 import { getCanonicalSkillWorkspace } from "../../agents/skill-workshop-workspace-context.js";
 import type { ChatType } from "../../channels/chat-type.js";
@@ -250,7 +251,7 @@ export function createSkillExperienceReviewScheduler(deps: ExperienceReviewSched
       clearTimer(pending.timer);
     }
     const generation = ++pending.generation;
-    const timer = setTimer(() => {
+    const timerCallback = () => {
       if (pendingBySession.get(sessionKey) !== pending || pending.generation !== generation) {
         return;
       }
@@ -300,7 +301,12 @@ export function createSkillExperienceReviewScheduler(deps: ExperienceReviewSched
             arm(sessionKey, pending, EXPERIENCE_REVIEW_RETRY_IDLE_MS);
           }
         });
-    }, delayMs);
+    };
+    // This timer outlives the foreground turn that armed it. Create its async
+    // resource outside the parent scope so review work admits on the current generation.
+    const timer = runOutsidePreparedModelRuntimePluginGenerationScope(() =>
+      setTimer(timerCallback, delayMs),
+    );
     pending.timer = timer;
     timer.unref?.();
   };

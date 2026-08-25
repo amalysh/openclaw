@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  getPreparedModelRuntimePluginGeneration,
+  withPreparedModelRuntimePluginGenerationScope,
+} from "../../agents/prepared-model-runtime-generation-scope.js";
+import type { PreparedModelRuntimePluginGeneration } from "../../agents/prepared-model-runtime.types.js";
+import {
   buildSkillExperienceReviewPrompt,
   formatSkillExperienceReviewTranscript,
 } from "./experience-review-prompt.js";
@@ -144,6 +149,42 @@ describe("skill experience review scheduler", () => {
       ctx: { authProfileId: "openai:work" },
     });
     expect(runReview.mock.calls[0]?.[0]).not.toHaveProperty("event");
+    scheduler.clear();
+  });
+
+  it("runs detached review work outside the foreground prepared generation", async () => {
+    const generation: PreparedModelRuntimePluginGeneration = {
+      configuredCatalogEntries: [],
+      inlineProviderModels: [],
+      pluginMetadataSnapshot: {} as never,
+    };
+    const observedGenerations: Array<PreparedModelRuntimePluginGeneration | undefined> = [];
+    let finishReview: (() => void) | undefined;
+    const reviewFinished = new Promise<void>((resolve) => {
+      finishReview = resolve;
+    });
+    const scheduler = createSkillExperienceReviewScheduler({
+      isSystemActive: () => {
+        observedGenerations.push(getPreparedModelRuntimePluginGeneration());
+        return false;
+      },
+      prepareReview: async (candidate) => {
+        observedGenerations.push(getPreparedModelRuntimePluginGeneration());
+        return candidate;
+      },
+      runReview: async () => {
+        observedGenerations.push(getPreparedModelRuntimePluginGeneration());
+        finishReview?.();
+      },
+      setTimer: (callback) => setTimeout(callback, 0),
+    });
+
+    withPreparedModelRuntimePluginGenerationScope(generation, () => {
+      scheduler.schedule(completedRun());
+    });
+    await reviewFinished;
+
+    expect(observedGenerations).toEqual([undefined, undefined, undefined]);
     scheduler.clear();
   });
 
