@@ -146,7 +146,8 @@ export function createBlockReplyCoalescer(params: {
     );
     const visibilityConflict =
       bufferText &&
-      (bufferedPayload?.isReasoning !== payload.isReasoning ||
+      bufferedPayload &&
+      (bufferedPayload.isReasoning !== payload.isReasoning ||
         bufferedPayload.isCommentary !== payload.isCommentary ||
         bufferedPayload.isCompactionNotice !== payload.isCompactionNotice ||
         bufferedPayload.isFallbackNotice !== payload.isFallbackNotice ||
