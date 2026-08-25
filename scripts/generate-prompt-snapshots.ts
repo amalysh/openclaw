@@ -145,7 +145,7 @@ function factorCodexPromptSnapshotFiles(files: PromptSnapshotFile[]): PromptSnap
     ) {
       throw new Error(`Codex prompt snapshot delta roundtrip failed: ${scenario[0]}`);
     }
-    return { path: `${file.path}.patch`, content: delta };
+    return { path: `${file.path}.diff`, content: delta };
   });
 }
 
@@ -251,7 +251,7 @@ export async function materializeCodexPromptSnapshot(scenario: string): Promise<
     return base;
   }
   const delta = await fs.readFile(
-    path.resolve(repoRoot, CODEX_RUNTIME_HAPPY_PATH_PROMPT_SNAPSHOT_DIR, `${targetFileName}.patch`),
+    path.resolve(repoRoot, CODEX_RUNTIME_HAPPY_PATH_PROMPT_SNAPSHOT_DIR, `${targetFileName}.diff`),
     "utf8",
   );
   return materializeCodexPromptSnapshotDelta({ scenario, base, delta });

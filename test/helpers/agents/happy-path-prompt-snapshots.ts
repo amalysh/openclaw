@@ -973,7 +973,7 @@ function renderReadme(scenarios: PromptScenario[]): string {
     "",
     "The tool catalog is pinned to the canonical happy-path OpenClaw tools so optional locally installed plugin tools do not create fixture churn.",
     "",
-    "The Telegram Markdown file is the complete canonical prompt snapshot. Discord and heartbeat are readable, SHA-bound zero-context `.md.patch` files with complete lossless differences from that base. Materialize one with `node --import tsx scripts/generate-prompt-snapshots.ts --materialize-prompt discord-group`; replace the scenario with `heartbeat-turn` or `telegram-direct` as needed.",
+    "The Telegram Markdown file is the complete canonical prompt snapshot. Discord and heartbeat are readable, SHA-bound zero-context `.md.diff` files with complete lossless differences from that base. Materialize one with `node --import tsx scripts/generate-prompt-snapshots.ts --materialize-prompt discord-group`; replace the scenario with `heartbeat-turn` or `telegram-direct` as needed.",
     "",
     "The Telegram JSON is the complete shared tool catalog. Discord and heartbeat JSON fixtures contain readable, complete replacements for their changed top-level tools or namespaces; their `base` field points to the Telegram catalog.",
     "",
@@ -1003,7 +1003,7 @@ function renderReadme(scenarios: PromptScenario[]): string {
     "Snapshots:",
     "",
     ...Object.entries(CODEX_PROMPT_SNAPSHOT_FILES).map(([scenario, fileName]) =>
-      scenario === CODEX_PROMPT_SNAPSHOT_BASE_SCENARIO ? `- ${fileName}` : `- ${fileName}.patch`,
+      scenario === CODEX_PROMPT_SNAPSHOT_BASE_SCENARIO ? `- ${fileName}` : `- ${fileName}.diff`,
     ),
     ...scenarios.map((scenario) => `- ${scenario.toolSnapshotFile}`),
     "",

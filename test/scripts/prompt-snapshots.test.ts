@@ -91,7 +91,7 @@ describe("happy path prompt snapshots", () => {
       const base = readCommittedSnapshot(
         CODEX_PROMPT_SNAPSHOT_FILES[CODEX_PROMPT_SNAPSHOT_BASE_SCENARIO],
       );
-      const delta = readCommittedSnapshot(`${fileName}.patch`);
+      const delta = readCommittedSnapshot(`${fileName}.diff`);
       expect(materializeCodexPromptSnapshotDelta({ scenario, base, delta })).toBe(materialized);
       expect(fs.existsSync(path.join(CODEX_RUNTIME_HAPPY_PATH_PROMPT_SNAPSHOT_DIR, fileName))).toBe(
         false,
@@ -108,7 +108,7 @@ describe("happy path prompt snapshots", () => {
     const base = readCommittedSnapshot(
       CODEX_PROMPT_SNAPSHOT_FILES[CODEX_PROMPT_SNAPSHOT_BASE_SCENARIO],
     );
-    const delta = readCommittedSnapshot(`${fileName}.patch`);
+    const delta = readCommittedSnapshot(`${fileName}.diff`);
     const corruptions = [
       `${delta}\ntrailing text\n`,
       delta.replace("\n", "\r\n"),
@@ -149,18 +149,22 @@ describe("happy path prompt snapshots", () => {
       const stalePaths = ["stale-snapshot.md", "stale-snapshot.md.patch"].map((fileName) =>
         path.join(CODEX_RUNTIME_HAPPY_PATH_PROMPT_SNAPSHOT_DIR, fileName),
       );
+      const currentPath = path.join(
+        CODEX_RUNTIME_HAPPY_PATH_PROMPT_SNAPSHOT_DIR,
+        "current-snapshot.md.diff",
+      );
       for (const stalePath of stalePaths) {
         fs.writeFileSync(path.join(root, stalePath), "stale\n");
       }
+      fs.writeFileSync(path.join(root, currentPath), "current\n");
 
-      const deleted = await deleteStalePromptSnapshotFiles(root, [
-        { path: path.join(CODEX_RUNTIME_HAPPY_PATH_PROMPT_SNAPSHOT_DIR, "current.md") },
-      ]);
+      const deleted = await deleteStalePromptSnapshotFiles(root, [{ path: currentPath }]);
 
       expect(deleted.toSorted()).toEqual(stalePaths.toSorted());
       for (const stalePath of stalePaths) {
         expect(fs.existsSync(path.join(root, stalePath))).toBe(false);
       }
+      expect(fs.readFileSync(path.join(root, currentPath), "utf8")).toBe("current\n");
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

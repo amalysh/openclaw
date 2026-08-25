@@ -14,7 +14,7 @@ The workspace bootstrap simulation includes dummy workspace contents so prompt r
 
 The tool catalog is pinned to the canonical happy-path OpenClaw tools so optional locally installed plugin tools do not create fixture churn.
 
-The Telegram Markdown file is the complete canonical prompt snapshot. Discord and heartbeat are readable, SHA-bound zero-context `.md.patch` files with complete lossless differences from that base. Materialize one with `node --import tsx scripts/generate-prompt-snapshots.ts --materialize-prompt discord-group`; replace the scenario with `heartbeat-turn` or `telegram-direct` as needed.
+The Telegram Markdown file is the complete canonical prompt snapshot. Discord and heartbeat are readable, SHA-bound zero-context `.md.diff` files with complete lossless differences from that base. Materialize one with `node --import tsx scripts/generate-prompt-snapshots.ts --materialize-prompt discord-group`; replace the scenario with `heartbeat-turn` or `telegram-direct` as needed.
 
 The Telegram JSON is the complete shared tool catalog. Discord and heartbeat JSON fixtures contain readable, complete replacements for their changed top-level tools or namespaces; their `base` field points to the Telegram catalog.
 
@@ -49,8 +49,8 @@ pnpm prompt:snapshots:check
 Snapshots:
 
 - telegram-direct-codex-message-tool.md
-- discord-group-codex-message-tool.md.patch
-- telegram-heartbeat-codex-tool.md.patch
+- discord-group-codex-message-tool.md.diff
+- telegram-heartbeat-codex-tool.md.diff
 - codex-dynamic-tools.telegram-direct.json
 - codex-dynamic-tools.discord-group.json
 - codex-dynamic-tools.heartbeat-turn.json
