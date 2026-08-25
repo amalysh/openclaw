@@ -42,7 +42,12 @@ describe("groupCatalogSessionsByProject", () => {
     ]);
 
     expect(result.groups).toMatchObject([
-      { key: "custom:Release", label: "Release", sessions: [{ threadId: "grouped" }] },
+      {
+        key: "custom:Release",
+        legacySectionKey: "custom:Release",
+        label: "Release",
+        sessions: [{ threadId: "grouped" }],
+      },
       {
         key: "project:/work/openclaw",
         legacySectionKey: "/work/openclaw",
@@ -142,7 +147,11 @@ describe("groupCatalogSessionsByPerson", () => {
       { ...session("one"), createdActor: { type: "human", id: "profile-ada", label: "  " } },
     ]);
 
-    expect(result.groups[0]).toMatchObject({ key: "person:profile-ada", label: "profile-ada" });
+    expect(result.groups[0]).toMatchObject({
+      key: "person:profile-ada",
+      legacySectionKey: "person:profile-ada",
+      label: "profile-ada",
+    });
   });
 
   it("leaves unattributed sessions in the flat ungrouped tail", () => {

@@ -55,16 +55,84 @@ describe("AppSidebar project session activity", () => {
     const project = sidebar.querySelector<HTMLButtonElement>(
       '[data-session-catalog-project="project:custom:repo"]',
     );
-    expect(customGroup?.getAttribute("aria-expanded")).toBe("true");
+    expect(customGroup?.getAttribute("aria-expanded")).toBe("false");
     expect(project?.getAttribute("aria-expanded")).toBe("false");
-    expect(sidebar.querySelector('[data-session-key*="custom-group-thread"]')).not.toBeNull();
+    expect(sidebar.querySelector('[data-session-key*="custom-group-thread"]')).toBeNull();
     expect(sidebar.querySelector('[data-session-key*="legacy-project-thread"]')).toBeNull();
 
     project?.click();
     await sidebar.updateComplete;
+    expect(customGroup?.getAttribute("aria-expanded")).toBe("true");
     expect(
       JSON.parse(localStorage.getItem("openclaw:sidebar:sessions:collapsed-sections") ?? "[]"),
     ).not.toContain("catalog-project:codex:gateway:local:custom:repo");
+
+    project?.click();
+    await sidebar.updateComplete;
+    customGroup?.click();
+    await sidebar.updateComplete;
+    expect(project?.getAttribute("aria-expanded")).toBe("false");
+    expect(customGroup?.getAttribute("aria-expanded")).toBe("false");
+    expect(
+      JSON.parse(localStorage.getItem("openclaw:sidebar:sessions:collapsed-sections") ?? "[]"),
+    ).toEqual([
+      "catalog-project:codex:gateway:local:project:custom:repo",
+      "catalog-custom:codex:gateway:local:custom:repo",
+    ]);
+  });
+
+  it("preserves and migrates collapsed person sections stored by earlier versions", async () => {
+    localStorage.setItem("openclaw:sidebar:sessions:catalog-grouping", "person");
+    const legacySectionId = "catalog-project:codex:gateway:local:person:profile-ada";
+    localStorage.setItem(
+      "openclaw:sidebar:sessions:collapsed-sections",
+      JSON.stringify([legacySectionId]),
+    );
+    const gateway = createGateway({} as GatewayBrowserClient);
+    const { sidebar } = await mountSidebar(gateway, createSessions("main", ["agent:main:main"]));
+    sidebar.sessionData.sessionCatalogs = [
+      {
+        id: "codex",
+        label: "Codex",
+        capabilities: { continueSession: true, archive: true },
+        hosts: [
+          {
+            hostId: "gateway:local",
+            label: "Local Codex",
+            kind: "gateway",
+            connected: true,
+            sessions: [
+              {
+                threadId: "person-thread",
+                name: "Ada's session",
+                createdActor: { type: "human", id: "profile-ada", label: "Ada" },
+                status: "idle",
+                archived: false,
+                canContinue: true,
+                canArchive: true,
+              },
+            ],
+          },
+        ],
+      },
+    ];
+    sidebar.sessionData.requestSessionDataUpdate();
+    await sidebar.updateComplete;
+
+    const person = sidebar.querySelector<HTMLButtonElement>(
+      '[data-session-catalog-project="person:profile-ada"]',
+    );
+    expect(person?.getAttribute("aria-expanded")).toBe("false");
+    expect(sidebar.querySelector('[data-session-key*="person-thread"]')).toBeNull();
+
+    person?.click();
+    await sidebar.updateComplete;
+    expect(person?.getAttribute("aria-expanded")).toBe("true");
+    person?.click();
+    await sidebar.updateComplete;
+    expect(
+      JSON.parse(localStorage.getItem("openclaw:sidebar:sessions:collapsed-sections") ?? "[]"),
+    ).toEqual(["catalog-person:codex:gateway:local:person:profile-ada"]);
   });
 
   it("preserves catalog menu focus when project groups reorder", async () => {

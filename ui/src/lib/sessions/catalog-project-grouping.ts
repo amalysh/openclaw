@@ -9,8 +9,8 @@ export function normalizeCatalogProjectGrouping(raw: unknown): CatalogProjectGro
 type CatalogProjectGroup = {
   kind: "custom" | "project" | "person";
   key: string;
-  // Project collapse ids predate namespaced group keys. Read the old suffix
-  // until the next toggle migrates that section to its canonical id.
+  // Collapse ids predate the group-kind namespace. Read the old suffix until
+  // the next toggle migrates that section to its canonical id.
   legacySectionKey?: string;
   label: string;
   title: string;
@@ -39,6 +39,7 @@ export function groupCatalogSessionsByProject(sessions: readonly SessionCatalogS
         group = {
           kind: "custom",
           key,
+          legacySectionKey: key,
           label: customGroup,
           title: `Custom group: ${customGroup}`,
           sessions: [],
@@ -103,7 +104,14 @@ export function groupCatalogSessionsByPerson(sessions: readonly SessionCatalogSe
     let group = groupsById.get(key);
     if (!group) {
       const label = actor.label?.trim() || actor.id;
-      group = { kind: "person", key, label, title: `Created by ${label}`, sessions: [] };
+      group = {
+        kind: "person",
+        key,
+        legacySectionKey: key,
+        label,
+        title: `Created by ${label}`,
+        sessions: [],
+      };
       groupsById.set(key, group);
     }
     group.sessions.push(session);
