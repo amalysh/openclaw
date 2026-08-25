@@ -1,58 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { GatewayBrowserClient } from "../../api/gateway.ts";
-import { buildCatalogSessionKey } from "../../lib/sessions/catalog-key.ts";
-import { catalogPage, createGateway, createSessions, mountSidebar } from "../app-sidebar.ts";
+import { createGateway, createSessions, mountSidebar } from "../app-sidebar.ts";
 import "../../components/app-sidebar.ts";
 
 describe("AppSidebar project session activity", () => {
-  it("collapses custom and project groups with colliding source text independently", async () => {
-    const gateway = createGateway({} as GatewayBrowserClient);
-    const { sidebar } = await mountSidebar(gateway, createSessions("main", ["agent:main:main"]));
-    sidebar.sessionData.sessionCatalogs = catalogPage([
-      {
-        threadId: "custom-thread",
-        name: "Custom session",
-        customGroup: "repo",
-      },
-      {
-        threadId: "project-thread",
-        name: "Project session",
-        cwd: "custom:repo",
-      },
-    ]).catalogs;
-    sidebar.sessionData.requestSessionDataUpdate();
-    await sidebar.updateComplete;
-
-    const customToggle = sidebar.querySelector<HTMLButtonElement>(
-      '[data-session-catalog-project="custom:repo"]',
-    );
-    const projectToggle = sidebar.querySelector<HTMLButtonElement>(
-      '[data-session-catalog-project="project:custom:repo"]',
-    );
-    const catalogRow = (threadId: string) =>
-      sidebar.querySelector(
-        `[data-catalog-session-key="${buildCatalogSessionKey({
-          catalogId: "codex",
-          hostId: "gateway:local",
-          threadId,
-        })}"]`,
-      );
-    const customRow = () => catalogRow("custom-thread");
-    const projectRow = () => catalogRow("project-thread");
-    expect(customRow()).not.toBeNull();
-    expect(projectRow()).not.toBeNull();
-
-    customToggle?.click();
-    await sidebar.updateComplete;
-    expect(customRow()).toBeNull();
-    expect(projectRow()).not.toBeNull();
-
-    projectToggle?.click();
-    await sidebar.updateComplete;
-    expect(customRow()).toBeNull();
-    expect(projectRow()).toBeNull();
-  });
-
   it("shows thread-style activity indicators", async () => {
     const gateway = createGateway({} as GatewayBrowserClient);
     const { sidebar } = await mountSidebar(gateway, createSessions("main", ["agent:main:main"]));

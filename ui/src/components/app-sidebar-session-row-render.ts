@@ -1,7 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { ifDefined } from "lit/directives/if-defined.js";
 import { keyed } from "lit/directives/keyed.js";
-import { ref } from "lit/directives/ref.js";
 import type { SessionObserverDigest } from "../../../packages/gateway-protocol/src/schema/sessions.js";
 import type { NavigationRouteId } from "../app-navigation.ts";
 import { withSidebarNavCollapseIntent } from "../app-session-route-paths.ts";
@@ -11,11 +10,7 @@ import { resolveControlUiAuthCandidates } from "../app/control-ui-auth.ts";
 import { t } from "../i18n/index.ts";
 import { sessionHasBoard } from "../lib/board/provider.ts";
 import { formatDurationCompact } from "../lib/format.ts";
-import {
-  restartHoverMarqueeIfHovered,
-  startHoverMarquee,
-  stopHoverMarquee,
-} from "../lib/hover-marquee.ts";
+import { startHoverMarqueeFromEvent, stopHoverMarqueeFromEvent } from "../lib/hover-marquee.ts";
 import { handleContextMenuEvent } from "../lib/keyboard-shortcuts.ts";
 import { projectPresencePayload } from "../lib/presence-users.ts";
 import { writeSessionDragData } from "../lib/sessions/drag.ts";
@@ -195,17 +190,12 @@ export function renderRecentSession(params: {
       : session.owner?.actor
     : undefined;
   const ownerId = ownerActor?.id?.trim();
-  const presenceProjection = ownerId
+  const ownerViewing = ownerId
     ? projectPresencePayload(
         host.sessionData.presencePayload,
         host.sessionDataContext?.gateway.snapshot.selfUser?.id,
         host.sessionData.presenceInstanceId,
-      )
-    : undefined;
-  const ownerViewing = ownerId
-    ? presenceProjection?.users.some(
-        (user) => user.id === ownerId && user.watchedSessions.includes(session.key),
-      )
+      ).users.some((user) => user.id === ownerId && user.watchedSessions.includes(session.key))
     : undefined;
   const gateway = host.sessionDataContext?.gateway;
   const channelAvatarAuth = {
@@ -242,12 +232,6 @@ export function renderRecentSession(params: {
   const hasTrail = session.isChild && (session.runtimeMs != null || session.startedAt != null);
   const metaId = hasTrail ? sidebarSessionMetaId(session.key) : undefined;
   const stateId = trailingDescription ? sidebarSessionStateId(session.key) : undefined;
-  const hasBoard = !session.isChild && sessionHasBoard(session.key);
-  const pullRequest = session.pullRequest ?? display?.pullRequest;
-  const hasApproval = sessionHasPendingApproval(
-    host.sessionData.approvalBadgeSnapshot(),
-    session.key,
-  );
   const openMenuFromEvent = (event: MouseEvent | KeyboardEvent) =>
     handleContextMenuEvent(
       event,
@@ -257,8 +241,7 @@ export function renderRecentSession(params: {
   const pinLabel = `${t(session.pinned ? "sessionsView.unpinSession" : "sessionsView.pinSession")}: ${label}`;
   const menuTooltip = t("chat.sidebar.openSessionMenu");
   const menuLabel = `${menuTooltip}: ${label}`;
-  const menuOpen =
-    host.sidebarMenus.sessionMenu?.session.key === session.key || display?.catalogMenuOpen === true;
+  const menuOpen = host.sidebarMenus.sessionMenu?.session.key === session.key;
   const rowClass = [
     "sidebar-recent-session",
     "session-row-host",
@@ -292,31 +275,11 @@ export function renderRecentSession(params: {
     requiredScope: "operator.write",
   });
   const rowDraggable = !session.isChild && groupWriteAccess.allowed;
-  const marqueeLabel = html`<span
-    ${display ? ref((element) => restartHoverMarqueeIfHovered(element)) : nothing}
-    class="sidebar-recent-session__name hover-marquee"
-    >${session.archived
-      ? html`<span
-          class="sidebar-session__archive-glyph"
-          aria-label=${t("sessionsView.archived")}
-          title=${t("sessionsView.archived")}
-          >${icons.archive}</span
-        >`
-      : nothing}${session.forkSource
-      ? html`<span
-          class="sidebar-session-fork-indicator"
-          role="img"
-          aria-label=${t("sessionsView.forkedSession")}
-          >${icons.gitFork}</span
-        >`
-      : nothing}${label}</span
-  >`;
   // Always reserve the lead so every title shares the section-label text line.
   const row = html`
     <div
       class=${rowClass}
       data-session-key=${session.key}
-      data-catalog-session-key=${display?.catalogIdentityKey ?? nothing}
       role=${ifDefined(listItem ? "listitem" : undefined)}
       draggable=${rowDraggable ? "true" : "false"}
       @dragstart=${!rowDraggable
@@ -334,8 +297,8 @@ export function renderRecentSession(params: {
           }}
       @contextmenu=${openMenuFromEvent}
       @keydown=${openMenuFromEvent}
-      @mouseenter=${(event: MouseEvent) => startHoverMarquee(event.currentTarget as HTMLElement)}
-      @mouseleave=${(event: MouseEvent) => stopHoverMarquee(event.currentTarget as HTMLElement)}
+      @mouseenter=${startHoverMarqueeFromEvent}
+      @mouseleave=${stopHoverMarqueeFromEvent}
     >
       <a
         href=${withSidebarNavCollapseIntent(session.href)}
@@ -354,11 +317,29 @@ export function renderRecentSession(params: {
             : nothing}</span
         >
         <span class="sidebar-recent-session__text">
-          <span class="sidebar-recent-session__title-row"> ${marqueeLabel} </span>
+          <span class="sidebar-recent-session__title-row">
+            <span class="sidebar-recent-session__name hover-marquee"
+              >${session.archived
+                ? html`<span
+                    class="sidebar-session__archive-glyph"
+                    aria-label=${t("sessionsView.archived")}
+                    title=${t("sessionsView.archived")}
+                    >${icons.archive}</span
+                  >`
+                : nothing}${session.forkSource
+                ? html`<span
+                    class="sidebar-session-fork-indicator"
+                    role="img"
+                    aria-label=${t("sessionsView.forkedSession")}
+                    >${icons.gitFork}</span
+                  >`
+                : nothing}${label}</span
+            >
+          </span>
           <span class="sidebar-recent-session__details">
             ${renderSidebarSessionSubtitle({ subtitle, narration })}
             <span class="sidebar-recent-session__details-endcap">
-              ${hasBoard
+              ${!session.isChild && sessionHasBoard(session.key)
                 ? html`<span
                     class="sidebar-board-glyph"
                     role="img"
@@ -379,8 +360,11 @@ export function renderRecentSession(params: {
               ${renderSessionRowBadges({
                 ...session,
                 hasComposerDraft: session.hasComposerDraft === true,
-                pullRequest,
-                hasApproval,
+                pullRequest: session.pullRequest ?? display?.pullRequest,
+                hasApproval: sessionHasPendingApproval(
+                  host.sessionData.approvalBadgeSnapshot(),
+                  session.key,
+                ),
               })}
               ${trailingIndicator === nothing
                 ? trailingDescription

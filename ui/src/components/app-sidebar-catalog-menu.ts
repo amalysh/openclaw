@@ -1,6 +1,6 @@
 // Owns catalog-row menu state, actions, focus anchor, and rendering for AppSidebar.
 import { html, nothing } from "lit";
-import { buildCatalogSessionKey, type CatalogSessionKey } from "../lib/sessions/catalog-key.ts";
+import type { CatalogSessionKey } from "../lib/sessions/catalog-key.ts";
 import { openCatalogSessionInTerminal } from "../lib/sessions/catalog-terminal.ts";
 import type { CatalogSessionMenuRequest } from "./app-sidebar-session-catalogs.ts";
 import "./catalog-session-menu.ts";
@@ -56,26 +56,6 @@ export class SidebarCatalogMenuController {
     }
     this.trigger = null;
     this.state = null;
-    this.hooks.requestUpdate();
-  }
-
-  retargetTrigger(root: ParentNode): void {
-    if (!this.state || this.trigger?.isConnected) {
-      return;
-    }
-    const identityKey = buildCatalogSessionKey(this.state.key);
-    const row = [...root.querySelectorAll<HTMLElement>("[data-catalog-session-key]")].find(
-      (candidate) => candidate.dataset.catalogSessionKey === identityKey,
-    );
-    const trigger = row?.querySelector<HTMLElement>(
-      "[data-catalog-session-menu], [data-session-menu]",
-    );
-    if (!trigger) {
-      return;
-    }
-    // Adoption can replace the row while its menu owns focus. Keep dismissal
-    // anchored to the replacement trigger instead of the disconnected node.
-    this.trigger = trigger;
     this.hooks.requestUpdate();
   }
 

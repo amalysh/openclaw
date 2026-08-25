@@ -1,5 +1,4 @@
 import { html, nothing } from "lit";
-import { ref } from "lit/directives/ref.js";
 import { repeat } from "lit/directives/repeat.js";
 import type {
   SessionCatalog,
@@ -12,11 +11,7 @@ import { withSidebarNavCollapseIntent } from "../app-session-route-paths.ts";
 import type { ApplicationNavigationOptions } from "../app/context.ts";
 import { t } from "../i18n/index.ts";
 import { formatUiError } from "../lib/format-error.ts";
-import {
-  restartHoverMarqueeIfHovered,
-  startHoverMarquee,
-  stopHoverMarquee,
-} from "../lib/hover-marquee.ts";
+import { startHoverMarqueeFromEvent, stopHoverMarqueeFromEvent } from "../lib/hover-marquee.ts";
 import { handleContextMenuEvent } from "../lib/keyboard-shortcuts.ts";
 import { shouldHandleNavigationClick } from "../lib/navigation-click.ts";
 import { isSessionRunActive } from "../lib/session-run-state.ts";
@@ -304,34 +299,6 @@ export function renderSessionCatalogGroups(params: SessionCatalogGroupsParams) {
 
 export type SessionCatalogGroupsRenderer = typeof renderSessionCatalogGroups;
 
-function catalogSessionIdentityKey(
-  catalog: SessionCatalog,
-  host: SessionCatalogHost,
-  session: SessionCatalogSession,
-): string {
-  return buildCatalogSessionKey({
-    catalogId: catalog.id,
-    hostId: host.hostId,
-    threadId: session.threadId,
-  });
-}
-
-function renderCatalogSessionRows(
-  catalog: SessionCatalog,
-  host: SessionCatalogHost,
-  sessions: readonly SessionCatalogSession[],
-  liveRowsByKey: ReadonlyMap<string, GatewaySessionRow>,
-  params: SessionCatalogGroupsParams,
-  projectChild = false,
-) {
-  return repeat(
-    sessions,
-    (session) => catalogSessionIdentityKey(catalog, host, session),
-    (session) =>
-      renderCatalogSessionRow(catalog, host, session, liveRowsByKey, params, projectChild),
-  );
-}
-
 function renderCatalogHostGroup(
   catalog: SessionCatalog,
   host: SessionCatalogHost,
@@ -347,6 +314,18 @@ function renderCatalogHostGroup(
       : params.projectGrouping === "person"
         ? groupCatalogSessionsByPerson(host.sessions)
         : null;
+  const renderRows = (sessions: readonly SessionCatalogSession[], projectChild = false) =>
+    repeat(
+      sessions,
+      (session) =>
+        buildCatalogSessionKey({
+          catalogId: catalog.id,
+          hostId: host.hostId,
+          threadId: session.threadId,
+        }),
+      (session) =>
+        renderCatalogSessionRow(catalog, host, session, liveRowsByKey, params, projectChild),
+    );
   // Gateway errors stay on the catalog header; node headings remain so remote rows keep their owner.
   const showHostHeading = host.kind !== "gateway";
   return html`
@@ -403,27 +382,14 @@ function renderCatalogHostGroup(
                           role="list"
                           aria-label=${`${host.label}: ${group.label}`}
                         >
-                          ${renderCatalogSessionRows(
-                            catalog,
-                            host,
-                            group.sessions,
-                            liveRowsByKey,
-                            params,
-                            true,
-                          )}
+                          ${renderRows(group.sessions, true)}
                         </div>`}
                   </div>
                 `;
               },
             )}
-            ${renderCatalogSessionRows(
-              catalog,
-              host,
-              projectGroups.ungrouped,
-              liveRowsByKey,
-              params,
-            )}`
-          : renderCatalogSessionRows(catalog, host, host.sessions, liveRowsByKey, params)}
+            ${renderRows(projectGroups.ungrouped)}`
+          : renderRows(host.sessions)}
       </div>
     </section>
   `;
@@ -440,24 +406,21 @@ function renderCatalogSessionRow(
   const timestamp = normalizeCatalogTimestamp(
     session.recencyAt ?? session.updatedAt ?? session.createdAt,
   );
+  const adoptedRow = session.sessionKey ? liveRowsByKey.get(session.sessionKey) : undefined;
+  if (adoptedRow) {
+    const label = session.name || session.threadId;
+    return params.renderLiveRow(adoptedRow, {
+      label,
+      ...(session.pullRequest ? { pullRequest: session.pullRequest } : {}),
+    });
+  }
   const catalogKey = {
     catalogId: catalog.id,
     hostId: host.hostId,
     threadId: session.threadId,
   } satisfies CatalogSessionKey;
-  const catalogMenuOpen = params.isMenuOpen(catalogKey);
-  const identityKey = catalogSessionIdentityKey(catalog, host, session);
-  const key = session.sessionKey ?? identityKey;
+  const key = session.sessionKey ?? buildCatalogSessionKey(catalogKey);
   const label = session.name || session.threadId;
-  const adoptedRow = session.sessionKey ? liveRowsByKey.get(session.sessionKey) : undefined;
-  if (adoptedRow) {
-    return params.renderLiveRow(adoptedRow, {
-      label,
-      catalogIdentityKey: identityKey,
-      catalogMenuOpen,
-      ...(session.pullRequest ? { pullRequest: session.pullRequest } : {}),
-    });
-  }
   const meta = formatSidebarTimestamp(timestamp);
   const routeId = "chat";
   const target = sessionNavigationTarget({
@@ -496,12 +459,7 @@ function renderCatalogSessionRow(
         : null,
       (trigger, x, y) => openMenu(x, y, trigger ?? undefined),
     );
-  const marqueeLabel = html`<span
-    ${ref((element) => restartHoverMarqueeIfHovered(element))}
-    class="sidebar-recent-session__name hover-marquee"
-    >${label}</span
-  >`;
-  const row = html`
+  return html`
     <div
       class="sidebar-recent-session session-row-host sidebar-recent-session--single-line ${active
         ? "sidebar-recent-session--active"
@@ -509,21 +467,12 @@ function renderCatalogSessionRow(
         ? "session-row-host--running"
         : ""}"
       data-session-key=${key}
-      data-catalog-session-key=${identityKey}
       data-session-row-action-count="1"
       role="listitem"
       @contextmenu=${openMenuFromEvent}
       @keydown=${openMenuFromEvent}
-      @mouseenter=${(event: MouseEvent) => {
-        if (event.currentTarget instanceof HTMLElement) {
-          startHoverMarquee(event.currentTarget);
-        }
-      }}
-      @mouseleave=${(event: MouseEvent) => {
-        if (event.currentTarget instanceof HTMLElement) {
-          stopHoverMarquee(event.currentTarget);
-        }
-      }}
+      @mouseenter=${startHoverMarqueeFromEvent}
+      @mouseleave=${stopHoverMarqueeFromEvent}
     >
       <a
         href=${withSidebarNavCollapseIntent(href)}
@@ -544,7 +493,9 @@ function renderCatalogSessionRow(
       >
         <span class="sidebar-session-indicator"></span>
         <span class="sidebar-recent-session__text">
-          <span class="sidebar-recent-session__title-row"> ${marqueeLabel} </span>
+          <span class="sidebar-recent-session__title-row">
+            <span class="sidebar-recent-session__name hover-marquee">${label}</span>
+          </span>
           <span class="sidebar-recent-session__details">
             <span class="sidebar-recent-session__details-endcap">
               ${renderSessionRowBadges({
@@ -575,7 +526,7 @@ function renderCatalogSessionRow(
             title=${t("chat.sidebar.openSessionMenu")}
             aria-label=${t("chat.sidebar.openSessionMenu")}
             aria-haspopup="menu"
-            aria-expanded=${String(catalogMenuOpen)}
+            aria-expanded=${String(params.isMenuOpen(catalogKey))}
             @click=${(event: MouseEvent) => {
               event.stopPropagation();
               const trigger = event.currentTarget as HTMLElement;
@@ -589,5 +540,4 @@ function renderCatalogSessionRow(
       </span>
     </div>
   `;
-  return row;
 }

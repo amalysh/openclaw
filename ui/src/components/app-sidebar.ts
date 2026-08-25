@@ -73,33 +73,6 @@ const sidebarChromeImport = createIdleImport(() =>
   ]),
 );
 
-type CatalogFocusTarget = { identityKey: string; selector: string };
-
-function captureCatalogFocusTarget(root: HTMLElement): CatalogFocusTarget | undefined {
-  const element = document.activeElement;
-  if (!(element instanceof HTMLElement) || !root.contains(element)) {
-    return undefined;
-  }
-  const row = element.closest<HTMLElement>("[data-catalog-session-key]");
-  const identityKey = row?.dataset.catalogSessionKey;
-  const selector = element.matches(".sidebar-recent-session__link")
-    ? ".sidebar-recent-session__link"
-    : element.matches("[data-child-session-toggle]")
-      ? "[data-child-session-toggle]"
-      : element.matches("[data-sidebar-session-pin]")
-        ? "[data-sidebar-session-pin]"
-        : element.matches("[data-catalog-session-menu], [data-session-menu]")
-          ? "[data-catalog-session-menu], [data-session-menu]"
-          : undefined;
-  return identityKey && selector ? { identityKey, selector } : undefined;
-}
-
-function findCatalogRow(root: ParentNode, identityKey: string): HTMLElement | undefined {
-  return [...root.querySelectorAll<HTMLElement>("[data-catalog-session-key]")].find(
-    (row) => row.dataset.catalogSessionKey === identityKey,
-  );
-}
-
 class AppSidebar extends AppSidebarSessionNavigationElement implements SessionListHost {
   @state() sidebarNarrationLines: ReadonlyMap<string, string> = new Map();
   @state() sidebarObserverDigests: ReadonlyMap<string, SessionObserverDigest> = new Map();
@@ -163,7 +136,6 @@ class AppSidebar extends AppSidebarSessionNavigationElement implements SessionLi
   private narrationLoad: Promise<void> | null = null;
   private sessionNavigationState: SidebarSessionNavigationState | undefined;
   private projectedSessionRows: SidebarRecentSession[] | undefined;
-  private catalogFocusTarget: CatalogFocusTarget | undefined;
   private readonly narrationSubscriptions = this.createNarrationSubscriptions();
   private readonly nativeGatewaysChanged = () => this.sidebarMenus.closeSessionMenu();
   private readonly refreshAppearanceSettings = () => this.context?.theme.refresh();
@@ -248,7 +220,6 @@ class AppSidebar extends AppSidebarSessionNavigationElement implements SessionLi
   }
 
   protected override willUpdate(changed: PropertyValues<this>) {
-    this.catalogFocusTarget = captureCatalogFocusTarget(this);
     super.willUpdate(changed);
     this.sessionNavigationState = super.getSessionNavigationState();
     this.projectedSessionRows = super.selectedAgentSessionRows(this.sessionNavigationState);
@@ -289,16 +260,6 @@ class AppSidebar extends AppSidebarSessionNavigationElement implements SessionLi
     }
     this.sessionNavigationState = undefined;
     this.projectedSessionRows = undefined;
-    const focusTarget = this.catalogFocusTarget;
-    this.catalogFocusTarget = undefined;
-    // Lit temporarily disconnects keyed rows while moving them. Restore only
-    // focus lost by that move, after the whole sidebar update has settled.
-    if (focusTarget && document.activeElement === document.body) {
-      findCatalogRow(this, focusTarget.identityKey)
-        ?.querySelector<HTMLElement>(focusTarget.selector)
-        ?.focus({ preventScroll: true });
-    }
-    this.sidebarMenus.catalogMenu.retargetTrigger(this);
   }
 
   private visibleNarrationRowsInOrder(): SidebarRecentSession[] {
