@@ -20,7 +20,9 @@ export async function listCommittedSnapshotArtifactPaths(root: string): Promise<
     committedEntries = [];
   }
   return committedEntries
-    .filter((entry) => entry.endsWith(".md") || entry.endsWith(".json"))
+    .filter(
+      (entry) => entry.endsWith(".md") || entry.endsWith(".md.patch") || entry.endsWith(".json"),
+    )
     .map((entry) => path.join(CODEX_RUNTIME_HAPPY_PATH_PROMPT_SNAPSHOT_DIR, entry));
 }
 
