@@ -90,7 +90,7 @@ function parseReviewState(value: string | null | undefined): Record<string, unkn
 }
 
 function reviewMap<T>(state: Record<string, unknown>, field: string): Record<string, T> {
-  // This cache-class object is written only by the helpers below; invalid outer JSON resets it.
+  // SAFETY: cache-class state written only by recordWorkspaceReview below; invalid outer JSON resets it.
   return (asNullableRecord(state[field]) ?? {}) as Record<string, T>;
 }
 

@@ -136,11 +136,3 @@ export function listWorkshopAuthoredSkillNames(
     ),
   );
 }
-
-export function isWorkshopOwnedSkillDir(
-  workspaceDir: string,
-  skillDir: string,
-  options: SkillWorkshopStoreOptions = {},
-): boolean {
-  return listWorkshopOwnedSkillDirs(workspaceDir, options).has(path.resolve(skillDir));
-}
