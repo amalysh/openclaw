@@ -28,6 +28,7 @@ describe("hover marquee", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllGlobals();
     document.body.replaceChildren();
   });
 
@@ -73,5 +74,60 @@ describe("hover marquee", () => {
       enter(row);
       leave(row);
     }).not.toThrow();
+  });
+
+  it("remeasures an active marquee when its available width changes", () => {
+    let resizeCallback: ResizeObserverCallback | undefined;
+    class TestResizeObserver implements ResizeObserver {
+      constructor(callback: ResizeObserverCallback) {
+        resizeCallback = callback;
+      }
+
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+    const callbackObserver: ResizeObserver = {
+      observe() {},
+      unobserve() {},
+      disconnect() {},
+    };
+    vi.stubGlobal("ResizeObserver", TestResizeObserver);
+    let labelWidth = 180;
+    const row = document.createElement("div");
+    row.className = "session-row-host";
+    Object.defineProperty(row, "matches", {
+      value: (selector: string) => selector === ":hover",
+    });
+    const label = document.createElement("span");
+    label.className = "hover-marquee";
+    label.textContent = "Fix stale iMessage group-allowlist warning copy";
+    row.append(label);
+    document.body.append(row);
+    Object.defineProperty(label, "clientWidth", { get: () => labelWidth });
+    Object.defineProperty(label, "scrollWidth", { value: 320 });
+
+    enter(row);
+    vi.advanceTimersByTime(500);
+    expect(label.style.getPropertyValue("--hover-marquee-shift")).toBe("-140px");
+    expect(label.classList.contains("hover-marquee--scrolling")).toBe(true);
+
+    labelWidth = 120;
+    const resizeEntry = {
+      target: label,
+      borderBoxSize: [],
+      contentBoxSize: [],
+      contentRect: label.getBoundingClientRect(),
+      devicePixelContentBoxSize: [],
+    } satisfies ResizeObserverEntry;
+    if (!resizeCallback) {
+      throw new Error("Expected the marquee to observe its label");
+    }
+    resizeCallback([resizeEntry], callbackObserver);
+
+    expect(label.style.getPropertyValue("--hover-marquee-shift")).toBe("-200px");
+    expect(label.classList.contains("hover-marquee--scrolling")).toBe(false);
+    vi.advanceTimersByTime(500);
+    expect(label.classList.contains("hover-marquee--scrolling")).toBe(true);
   });
 });

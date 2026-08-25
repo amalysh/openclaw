@@ -481,13 +481,6 @@ function renderCatalogSessionRow(
     return params.renderLiveRow(adoptedRow, {
       label,
       catalogIdentityKey: identityKey,
-      marqueeKey: JSON.stringify([
-        label,
-        session.pullRequest,
-        adoptedRow.updatedAt,
-        adoptedRow.hasActiveRun,
-        adoptedRow.unread,
-      ]),
       catalogMenuOpen: menuOpen,
       ...(rowRef ? { rowRef } : {}),
       ...(session.pullRequest ? { pullRequest: session.pullRequest } : {}),
