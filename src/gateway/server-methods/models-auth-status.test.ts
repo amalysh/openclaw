@@ -807,7 +807,7 @@ describe("models.authStatus", () => {
     expect(provider).toMatchObject({ provider: "minimax-portal", status: "expired" });
   });
 
-  it("does not publish a synthetic Anthropic missing row beside owned Claude CLI OAuth", async () => {
+  it("keeps native Claude CLI auth separate from Anthropic provider auth", async () => {
     const profileId = "anthropic:claude-cli";
     mocks.getRuntimeConfig.mockReturnValue({
       auth: { profiles: { [profileId]: { provider: "anthropic", mode: "token" } } },
@@ -858,10 +858,11 @@ describe("models.authStatus", () => {
     const result = await readAuthStatus();
 
     expect(result.providers).toEqual([
+      expect.objectContaining({ provider: "anthropic", status: "missing", profiles: [] }),
       expect.objectContaining({
         provider: "claude-cli",
         status: "ok",
-        profiles: [expect.anything()],
+        profiles: [expect.objectContaining({ profileId, status: "expired" })],
       }),
     ]);
   });

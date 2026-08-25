@@ -1895,23 +1895,9 @@ describe("buildStatusReply subagent summary", () => {
     );
   });
 
-  it("uses Claude CLI OAuth auth labels for anthropic models running on the Claude CLI runtime", async () => {
+  it("uses native auth labels for anthropic models running on the Claude CLI runtime", async () => {
     await withTempHome(
-      async (dir) => {
-        const authPath = path.join(dir, ".claude", ".credentials.json");
-        fs.mkdirSync(path.dirname(authPath), { recursive: true });
-        fs.writeFileSync(
-          authPath,
-          JSON.stringify({
-            claudeAiOauth: {
-              accessToken: "access-token",
-              refreshToken: "refresh-token",
-              expiresAt: Date.now() + 60_000,
-            },
-          }),
-          "utf8",
-        );
-
+      async () => {
         const text = await buildStatusText({
           cfg: {
             ...baseCfg,
@@ -1943,7 +1929,7 @@ describe("buildStatusReply subagent summary", () => {
 
         const normalized = normalizeTestText(text);
         expect(normalized).toContain("Model: anthropic/claude-opus-4-7");
-        expect(normalized).toContain("oauth (claude-cli)");
+        expect(normalized).toContain("native (claude-cli)");
       },
       {
         env: {

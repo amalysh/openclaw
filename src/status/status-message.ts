@@ -124,7 +124,14 @@ type StatusArgs = {
   now?: number;
 };
 
-type NormalizedAuthMode = "api-key" | "oauth" | "token" | "aws-sdk" | "mixed" | "unknown";
+type NormalizedAuthMode =
+  | "api-key"
+  | "oauth"
+  | "token"
+  | "aws-sdk"
+  | "mixed"
+  | "native"
+  | "unknown";
 
 function normalizeAuthMode(value?: string): NormalizedAuthMode | undefined {
   const normalized = normalizeOptionalLowercaseString(value);
@@ -145,6 +152,9 @@ function normalizeAuthMode(value?: string): NormalizedAuthMode | undefined {
   }
   if (normalized === "mixed" || normalized.startsWith("mixed ")) {
     return "mixed";
+  }
+  if (normalized === "native" || normalized.startsWith("native ")) {
+    return "native";
   }
   if (normalized === "unknown") {
     return "unknown";

@@ -43,7 +43,7 @@ describe("models.list CLI runtime availability", () => {
     vi.unstubAllEnvs();
   });
 
-  it("marks a Claude CLI runtime model available with ambient CLI OAuth", async () => {
+  it("does not infer Claude CLI runtime availability from native credential files", async () => {
     const homeDir = tempDirs.make("models-list-claude-cli-");
     const credentialDir = path.join(homeDir, ".claude");
     fs.mkdirSync(credentialDir, { recursive: true, mode: 0o700 });
@@ -60,12 +60,6 @@ describe("models.list CLI runtime availability", () => {
     );
     vi.stubEnv("HOME", homeDir);
 
-    await expect(listClaudeCliModel()).resolves.toEqual({
-      models: [expect.objectContaining({ id: "claude-opus-5", available: true })],
-    });
-  });
-
-  it("marks a Claude CLI runtime model unavailable without ambient CLI OAuth", async () => {
     await expect(listClaudeCliModel()).resolves.toEqual({
       models: [expect.objectContaining({ id: "claude-opus-5", available: false })],
     });

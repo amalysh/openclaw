@@ -1632,7 +1632,7 @@ describe("models.list", () => {
     });
   });
 
-  it("keeps catalog models available through a refresh-owned CLI runtime", async () => {
+  it("does not treat retired Claude CLI auth profiles as model availability evidence", async () => {
     await withoutAnthropicEnvAuth(async () => {
       await withModelsTestState(
         {
@@ -1709,7 +1709,7 @@ describe("models.list", () => {
                     devicePlacementSupported: false,
                     source: "model",
                   },
-                  available: true,
+                  available: false,
                   tags: ["configured"],
                 },
               ],

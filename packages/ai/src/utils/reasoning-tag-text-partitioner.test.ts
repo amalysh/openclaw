@@ -6,6 +6,12 @@ import {
 } from "./reasoning-tag-text-partitioner.js";
 
 describe("createReasoningTagTextPartitioner", () => {
+  // These assertions bound parser work; wall time also includes shared-runner scheduling.
+  function elapsedProcessCpuMs(startedAt: ReturnType<typeof process.cpuUsage>): number {
+    const elapsed = process.cpuUsage(startedAt);
+    return (elapsed.user + elapsed.system) / 1_000;
+  }
+
   function collectVisibleMode(input: string, splitPoints: readonly number[]) {
     const partitioner = createReasoningTagTextPartitioner();
     const deltas: ReasoningTagTextDelta[] = [];
@@ -215,7 +221,7 @@ describe("createReasoningTagTextPartitioner", () => {
 
   it("recovers a byte-streamed 110KB malformed quoted tag without reparsing prefixes", () => {
     const input = `<think data-x="${"x".repeat(110_000)}<think>hidden</think>After`;
-    const startedAt = Date.now();
+    const startedAt = process.cpuUsage();
     const result = collectVisibleMode(
       input,
       Array.from({ length: input.length }, (_value, index) => index + 1),
@@ -224,12 +230,12 @@ describe("createReasoningTagTextPartitioner", () => {
     expect(result.text).not.toContain("hidden");
     expect(result.text.endsWith("After")).toBe(true);
     expect(result.thinking).toBe("hidden");
-    expect(Date.now() - startedAt).toBeLessThan(30_000);
+    expect(elapsedProcessCpuMs(startedAt)).toBeLessThan(30_000);
   });
 
   it("keeps newline-heavy malformed-tag recovery linear", () => {
     const input = `<think data-x="${"x\n".repeat(20_000)}<think>hidden</think>After`;
-    const startedAt = Date.now();
+    const startedAt = process.cpuUsage();
     const result = collectVisibleMode(
       input,
       Array.from({ length: input.length }, (_value, index) => index + 1),
@@ -237,12 +243,12 @@ describe("createReasoningTagTextPartitioner", () => {
 
     expect(result.text).not.toContain("hidden");
     expect(result.text.endsWith("After")).toBe(true);
-    expect(Date.now() - startedAt).toBeLessThan(30_000);
+    expect(elapsedProcessCpuMs(startedAt)).toBeLessThan(30_000);
   });
 
   it("bounds parser-owned reparsing across many code-bearing blocks", () => {
     const partitioner = createReasoningTagTextPartitioner();
-    const startedAt = Date.now();
+    const startedAt = process.cpuUsage();
     const deltas: ReasoningTagTextDelta[] = [];
     for (let index = 0; index < 1_600; index += 1) {
       deltas.push(...partitioner.pushVisible("`literal` <thinking/>\n\n"));
@@ -250,12 +256,12 @@ describe("createReasoningTagTextPartitioner", () => {
     deltas.push(...partitioner.flush());
 
     expect(deltas.filter((delta) => delta.kind === "thinking")).toEqual([]);
-    expect(Date.now() - startedAt).toBeLessThan(10_000);
+    expect(elapsedProcessCpuMs(startedAt)).toBeLessThan(10_000);
   });
 
   it("does not repeatedly reparse a growing list container", () => {
     const partitioner = createReasoningTagTextPartitioner();
-    const startedAt = Date.now();
+    const startedAt = process.cpuUsage();
     const deltas: ReasoningTagTextDelta[] = [...partitioner.pushVisible("- item\n")];
     for (let index = 0; index < 800; index += 1) {
       deltas.push(...partitioner.pushVisible("  `literal`\n\n"));
@@ -263,12 +269,12 @@ describe("createReasoningTagTextPartitioner", () => {
     deltas.push(...partitioner.flush());
 
     expect(deltas.filter((delta) => delta.kind === "thinking")).toEqual([]);
-    expect(Date.now() - startedAt).toBeLessThan(5_000);
+    expect(elapsedProcessCpuMs(startedAt)).toBeLessThan(5_000);
   });
 
   it("does not repeatedly reparse a growing unclosed tilde fence", () => {
     const partitioner = createReasoningTagTextPartitioner();
-    const startedAt = Date.now();
+    const startedAt = process.cpuUsage();
     const deltas: ReasoningTagTextDelta[] = [...partitioner.pushVisible("~~~xml\n")];
     for (let index = 0; index < 3_200; index += 1) {
       deltas.push(...partitioner.pushVisible("<thinking/>\n"));
@@ -276,12 +282,12 @@ describe("createReasoningTagTextPartitioner", () => {
     deltas.push(...partitioner.pushVisible("~~~\ntail"), ...partitioner.flush());
 
     expect(deltas.filter((delta) => delta.kind === "thinking")).toEqual([]);
-    expect(Date.now() - startedAt).toBeLessThan(5_000);
+    expect(elapsedProcessCpuMs(startedAt)).toBeLessThan(5_000);
   });
 
   it("compacts repeated blank-terminated ordinary text", () => {
     const partitioner = createReasoningTagTextPartitioner();
-    const startedAt = Date.now();
+    const startedAt = process.cpuUsage();
     let emittedLength = 0;
     for (let index = 0; index < 2_000; index += 1) {
       emittedLength += partitioner
@@ -292,24 +298,24 @@ describe("createReasoningTagTextPartitioner", () => {
     expect(emittedLength).toBe(14_000);
     expect(partitioner.hasPending()).toBe(false);
     expect(partitioner.flush()).toEqual([]);
-    expect(Date.now() - startedAt).toBeLessThan(5_000);
+    expect(elapsedProcessCpuMs(startedAt)).toBeLessThan(5_000);
   });
 
   it("compacts blank-only streams without retaining an empty tree", () => {
     const partitioner = createReasoningTagTextPartitioner();
-    const startedAt = Date.now();
+    const startedAt = process.cpuUsage();
     for (let index = 0; index < 5_000; index += 1) {
       expect(partitioner.pushVisible("\n\n")).toEqual([{ kind: "text", text: "\n\n" }]);
     }
 
     expect(partitioner.hasPending()).toBe(false);
     expect(partitioner.flush()).toEqual([]);
-    expect(Date.now() - startedAt).toBeLessThan(5_000);
+    expect(elapsedProcessCpuMs(startedAt)).toBeLessThan(5_000);
   });
 
   it("compacts top-level prose after a completed list block", () => {
     const partitioner = createReasoningTagTextPartitioner();
-    const startedAt = Date.now();
+    const startedAt = process.cpuUsage();
     let emittedLength = partitioner
       .pushVisible("- item\n\n")
       .reduce((total, delta) => total + delta.text.length, 0);
@@ -322,12 +328,12 @@ describe("createReasoningTagTextPartitioner", () => {
     expect(emittedLength).toBe(14_008);
     expect(partitioner.hasPending()).toBe(false);
     expect(partitioner.flush()).toEqual([]);
-    expect(Date.now() - startedAt).toBeLessThan(5_000);
+    expect(elapsedProcessCpuMs(startedAt)).toBeLessThan(5_000);
   });
 
   it("compacts blank boundaries containing horizontal whitespace", () => {
     const partitioner = createReasoningTagTextPartitioner();
-    const startedAt = Date.now();
+    const startedAt = process.cpuUsage();
     let emittedLength = 0;
     for (let index = 0; index < 2_000; index += 1) {
       emittedLength += partitioner
@@ -338,7 +344,7 @@ describe("createReasoningTagTextPartitioner", () => {
     expect(emittedLength).toBe(18_000);
     expect(partitioner.hasPending()).toBe(false);
     expect(partitioner.flush()).toEqual([]);
-    expect(Date.now() - startedAt).toBeLessThan(5_000);
+    expect(elapsedProcessCpuMs(startedAt)).toBeLessThan(5_000);
   });
 
   it("routes split inline reasoning tags away from visible text", () => {
