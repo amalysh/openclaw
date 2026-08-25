@@ -85,8 +85,9 @@ describe("skill_workshop tool", () => {
 
     expect(JSON.stringify(tool.parameters)).toContain('"enum":["read","reconcile"]');
     expect(JSON.stringify(tool.parameters)).toContain(
-      "Exactly one decision for every current skill, plus optional new write decisions. Skills not created by Skill Workshop are read-only and require keep. write requires description and complete SKILL.md content; drop requires a reason.",
+      "Only the skills to change; unlisted skills stay. write requires description and complete SKILL.md content; drop requires a reason. Skills not created by Skill Workshop are read-only.",
     );
+    expect(JSON.stringify(tool.parameters)).toContain('"enum":["write","drop"]');
     expect(tool.description).toContain(SKILL_AUTHORING_STANDARDS_PROMPT);
     await tool.execute("read", { action: "read", skill_name: "duplicate" });
     await tool.execute("reconcile", {
@@ -136,7 +137,7 @@ describe("skill_workshop tool", () => {
 
     const first = tool.execute("first", {
       action: "reconcile",
-      collection: [{ action: "keep", name: "procedure" }],
+      collection: [],
     });
     await expect(
       tool.execute("second", {

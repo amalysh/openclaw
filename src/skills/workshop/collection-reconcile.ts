@@ -149,8 +149,9 @@ export async function reconcileSkillCollection(params: {
         MAX_RECONCILED_SKILLS,
         params.approvedSkillNamesByAgent,
       );
+      const plannedNames = new Set(plan.map((entry) => entry.name));
       const outcome = {
-        kept: plan.filter((entry) => entry.action === "keep").map((entry) => entry.name),
+        kept: current.filter((skill) => !plannedNames.has(skill.name)).map((skill) => skill.name),
         written: plan.filter((entry) => entry.action === "write").map((entry) => entry.name),
         dropped: plan
           .filter(
@@ -162,9 +163,10 @@ export async function reconcileSkillCollection(params: {
       await assertCollectionReadsCurrent(
         current,
         params.readSkillHashes,
+        plannedNames,
         MAX_RECONCILED_SKILL_BYTES,
       );
-      if (plan.every((entry) => entry.action === "keep")) {
+      if (plan.length === 0) {
         const backupRoot = resolveSkillCollectionBackupRoot(workspaceDir, params.env);
         let backupId = await latestCommittedBackupId(backupRoot);
         if (!backupId) {
@@ -175,15 +177,12 @@ export async function reconcileSkillCollection(params: {
             env: params.env,
           });
           try {
-            await assertCollectionMutationCurrent(current, params.readSkillTreeHashes, []);
             await commitCollectionBackup(workspaceDir, backup);
           } catch (error) {
             await discardPendingCollectionBackup(backup);
             throw error;
           }
           backupId = backup.manifest.id;
-        } else {
-          await assertCollectionMutationCurrent(current, params.readSkillTreeHashes, []);
         }
         clearCuratedSkillLifecycle(
           current.map((skill) => skill.filePath),
@@ -232,7 +231,7 @@ export async function reconcileSkillCollection(params: {
         if (shouldDispatch) {
           for (const entry of plan) {
             const existing = currentByName.get(entry.name);
-            if (entry.action === "keep" || !existing) {
+            if (!existing) {
               continue;
             }
             before.set(
@@ -246,7 +245,12 @@ export async function reconcileSkillCollection(params: {
           }
         }
         try {
-          await assertCollectionMutationCurrent(current, params.readSkillTreeHashes, prepared);
+          await assertCollectionMutationCurrent(
+            current,
+            params.readSkillTreeHashes,
+            plannedNames,
+            prepared,
+          );
         } catch (error) {
           await discardPendingCollectionBackup(backup);
           throw error;
@@ -335,9 +339,6 @@ export async function reconcileSkillCollection(params: {
         const changes: SkillCollectionChange[] = [];
         if (shouldDispatch) {
           for (const entry of plan) {
-            if (entry.action === "keep") {
-              continue;
-            }
             const existing = currentByName.get(entry.name);
             const skillDir = existing?.baseDir ?? path.join(workspaceDir, "skills", entry.name);
             changes.push({

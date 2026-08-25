@@ -58,16 +58,16 @@ Only a `pending` proposal can be revised, applied, rejected, or quarantined.
 ## Collection review
 
 In `auto` mode, the Gateway starts one isolated collection-review session per
-agent workspace each day. The session can only read skills and submit
-one complete collection reconciliation. It keeps distinct useful skills,
+agent workspace each week. The session can only read skills and submit
+one atomic collection reconciliation listing only changes. It keeps distinct useful skills,
 rewrites weak ones, consolidates overlap, and drops junk or stale fragments.
 Choosing `auto` intentionally authorizes those rewrites and drops without a
 second approval **for Workshop-owned paths only**; `propose` and `off` do not
 run collection review.
 
-Every eligible workspace skill must be read and receive exactly one decision.
-Skills without applied Workshop create provenance are read-only and must receive
-`keep`; Workshop-owned skills may receive `keep`, `write`, or `drop`. A new
+The reviewer reads each skill it intends to change. Unlisted skills stay untouched.
+Skills without applied Workshop create provenance are read-only; Workshop-owned
+skills may receive `write` or `drop`. A new
 skill created during collection review is recorded as an automatically applied
 `create` proposal, which makes that directory Workshop-owned. Disabled and
 agent-filtered skills stay untouched.
@@ -89,8 +89,8 @@ To undo the last completed cleanup, ask the agent to restore the skill
 collection. It uses `skill_workshop` action `restore_collection` under the same
 workspace lock. Restore refuses if any affected skill changed after cleanup.
 
-The daily attempt is persisted per workspace before the model starts. Gateway
-restarts do not repeat a failed or successful attempt within 24 hours. Review is admitted only for collections of at most
+The weekly attempt is persisted per workspace before the model starts. Gateway
+restarts do not repeat a failed or successful attempt within 7 days. Review is admitted only for collections of at most
 200 skills and 240,000 total `SKILL.md` bytes. Larger collections stay unchanged.
 The reconciled result must stay inside the same byte limit.
 
@@ -100,7 +100,7 @@ the latest 90 outcomes per workspace.
 
 Collection rewrites and merges produce `SKILL.md` files at or below 10,000
 characters. A skill already above the cap can only become shorter. User-authored
-skills always receive `keep`.
+skills stay untouched.
 
 ## Chat
 
@@ -375,13 +375,13 @@ the proposal threshold, and troubleshooting.
 }
 ```
 
-| Setting                    | Default  | Effect                                                                                                                                                                          |
-| -------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `autonomous.mode`          | `"auto"` | `"off"` disables autonomous capture, `"propose"` creates pending captures, and `"auto"` applies captures and runs daily cleanup that can rewrite or drop Workshop-owned skills. |
-| `allowSymlinkTargetWrites` | `false`  | Lets apply write through workspace skill symlinks whose real target is listed in `skills.load.allowSymlinkTargets`.                                                             |
-| `approvalPolicy`           | `"auto"` | `"auto"` skips an additional prompt for agent-initiated `apply`, `reject`, or `quarantine` (the agent still has to call the action). `"pending"` requires approval.             |
-| `maxPending`               | `50`     | Caps pending and quarantined proposals per workspace (1-200).                                                                                                                   |
-| `maxSkillBytes`            | `40000`  | Caps manual and foreground proposal body size in bytes (1024-200000). Autonomous results have a 10,000-character cap.                                                           |
+| Setting                    | Default  | Effect                                                                                                                                                                           |
+| -------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `autonomous.mode`          | `"auto"` | `"off"` disables autonomous capture, `"propose"` creates pending captures, and `"auto"` applies captures and runs weekly cleanup that can rewrite or drop Workshop-owned skills. |
+| `allowSymlinkTargetWrites` | `false`  | Lets apply write through workspace skill symlinks whose real target is listed in `skills.load.allowSymlinkTargets`.                                                              |
+| `approvalPolicy`           | `"auto"` | `"auto"` skips an additional prompt for agent-initiated `apply`, `reject`, or `quarantine` (the agent still has to call the action). `"pending"` requires approval.              |
+| `maxPending`               | `50`     | Caps pending and quarantined proposals per workspace (1-200).                                                                                                                    |
+| `maxSkillBytes`            | `40000`  | Caps manual and foreground proposal body size in bytes (1024-200000). Autonomous results have a 10,000-character cap.                                                            |
 
 In `propose` and `auto` modes, an isolated run of the selected model decides whether the
 completed trajectory clears the evidence-gated proposal bar. The foreground model is not prompted
@@ -422,7 +422,7 @@ Proposal descriptions are always capped at 160 bytes, independent of
 
 `skills.curator.status` also reports the latest collection and experience review
 outcome per workspace. The other curator methods manage lifecycle state written
-by older releases. Daily review does not use age, pin, or overlap state.
+by older releases. Weekly review does not use age, pin, or overlap state.
 
 `requestRevision` is Gateway-only (no CLI or agent-tool equivalent): it
 forwards free-text revision instructions to the owning agent's chat session

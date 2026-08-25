@@ -19,7 +19,6 @@ export function autonomousSkillSizeError(
 }
 
 export type SkillCollectionPlanEntry =
-  | { action: "keep"; name: string }
   | { action: "drop"; name: string; reason: string }
   | { action: "write"; name: string; description: string; content: string };
 

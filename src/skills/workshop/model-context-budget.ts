@@ -8,7 +8,6 @@ const MODEL_CONTEXT_PROJECTION_SHARE = 0.35;
 const MIN_PROJECTION_CHARS = 256;
 
 const PROJECTION_CAPS = {
-  artifactChars: 20_000,
   collectionHistoryChars: 8_000,
   historyTranscriptChars: 80_000,
 } as const;
@@ -37,7 +36,7 @@ export function resolveSkillWorkshopProjectionBudgets(contextTokens?: number) {
     Math.floor(effectiveContextTokens * MODEL_CONTEXT_PROJECTION_SHARE),
   );
   return {
-    artifactChars: Math.min(contextChars, PROJECTION_CAPS.artifactChars),
+    artifactChars: contextChars,
     collectionHistoryChars: Math.min(contextChars, PROJECTION_CAPS.collectionHistoryChars),
     historyTranscriptChars: Math.min(contextChars, PROJECTION_CAPS.historyTranscriptChars),
   };

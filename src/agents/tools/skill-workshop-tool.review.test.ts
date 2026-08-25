@@ -400,7 +400,7 @@ describe("skill_workshop review mode", () => {
     expect(proposalMutationBudget.remaining).toBe(0);
   });
 
-  it("lets an oversized skill shrink without a complete reviewer read", async () => {
+  it("rejects oversized growth but permits shrink in review mode", async () => {
     const workspaceDir = await tempDirs.make("openclaw-skill-workshop-review-read-cap-");
     await seedLiveSkill(
       workspaceDir,
@@ -430,10 +430,8 @@ describe("skill_workshop review mode", () => {
       skill_name: "big-skill",
     });
     const text = (read.content[0] as { text: string }).text;
-    expect(read.details).toMatchObject({ skillKey: "big-skill", contentIncluded: false });
-    expect(text.length).toBeLessThanOrEqual(20_000);
-    expect(text).toContain("Content omitted");
-    expect(text).not.toContain("A detailed operational line.");
+    expect(read.details).toMatchObject({ skillKey: "big-skill", contentIncluded: true });
+    expect(text).toContain("A detailed operational line.");
 
     await expect(
       reviewTool.execute("oversized-growth", {

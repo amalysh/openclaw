@@ -76,7 +76,12 @@ describe("skill collection review", () => {
       });
       const state = readSkillReviewOutcomes({ env: testState.env });
       expect(Object.values(state.collectionReviews)[0]?.attemptedAtMs).toBeTypeOf("number");
-      expect(params.prompt).toContain("make one successful action=reconcile call");
+      expect(params.prompt.split("\n")[0]).toBe(
+        "Weekly skill collection review. Read the skills you intend to change with skill_workshop action=read, then finish with one action=reconcile call that lists only writes and drops; unlisted skills stay. Always make the call; an empty collection records that nothing changed.",
+      );
+      expect(params.prompt).toContain(
+        "Skills tagged user-authored: leave unlisted; the operator owns them.",
+      );
       expect(params.prompt).toContain('"tag":"user-authored"');
       const tool = createSkillWorkshopTool({
         workspaceDir: params.workspaceDir,
@@ -102,7 +107,7 @@ describe("skill collection review", () => {
       ).rejects.toThrow("User-authored skill must stay unchanged");
       await tool.execute("reconcile", {
         action: "reconcile",
-        collection: [{ action: "keep", name: "useful" }],
+        collection: [],
       });
       return {};
     });
@@ -153,10 +158,9 @@ describe("skill collection review", () => {
         env: params.skillWorkshopProposalEnv,
         collectionReconcile: params.skillWorkshopCollectionReconcile,
       });
-      await tool.execute("read", { action: "read", skill_name: "hostile" });
       await tool.execute("reconcile", {
         action: "reconcile",
-        collection: [{ action: "keep", name: "hostile" }],
+        collection: [],
       });
       return {};
     });
@@ -174,7 +178,7 @@ describe("skill collection review", () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
-  it("uses the attempted time as the daily boundary", async () => {
+  it("uses the attempted time as the weekly boundary", async () => {
     const workspaceDir = await fs.realpath(
       await tempDirs.make("openclaw-collection-review-cadence-"),
     );
@@ -186,12 +190,12 @@ describe("skill collection review", () => {
       { env: testState.env },
     );
     expect(
-      isSkillCollectionReviewDue(workspaceDir, nowMs + 23 * 60 * 60_000, {
+      isSkillCollectionReviewDue(workspaceDir, nowMs + 24 * 60 * 60_000, {
         env: testState.env,
       }),
     ).toBe(false);
     expect(
-      isSkillCollectionReviewDue(workspaceDir, nowMs + 24 * 60 * 60_000, {
+      isSkillCollectionReviewDue(workspaceDir, nowMs + 7 * 24 * 60 * 60_000, {
         env: testState.env,
       }),
     ).toBe(true);
@@ -237,10 +241,9 @@ describe("skill collection review", () => {
         env: params.skillWorkshopProposalEnv,
         collectionReconcile: params.skillWorkshopCollectionReconcile,
       });
-      await tool.execute("read", { action: "read", skill_name: "useful" });
       await tool.execute("reconcile", {
         action: "reconcile",
-        collection: [{ action: "keep", name: "useful" }],
+        collection: [],
       });
       throw new Error("runner crashed after reconciliation");
     });
@@ -288,14 +291,9 @@ describe("skill collection review", () => {
         env: params.skillWorkshopProposalEnv,
         collectionReconcile: params.skillWorkshopCollectionReconcile,
       });
-      await tool.execute("read-alpha", { action: "read", skill_name: "alpha" });
-      await tool.execute("read-beta", { action: "read", skill_name: "beta" });
       await tool.execute("reconcile", {
         action: "reconcile",
-        collection: [
-          { action: "keep", name: "alpha" },
-          { action: "keep", name: "beta" },
-        ],
+        collection: [],
       });
       return {};
     });
@@ -412,10 +410,9 @@ describe("skill collection review", () => {
         env: params.skillWorkshopProposalEnv,
         collectionReconcile: params.skillWorkshopCollectionReconcile,
       });
-      await tool.execute("read", { action: "read", skill_name: "useful" });
       await tool.execute("reconcile", {
         action: "reconcile",
-        collection: [{ action: "keep", name: "useful" }],
+        collection: [],
       });
       return {};
     });
@@ -472,10 +469,9 @@ describe("skill collection review", () => {
         env: params.skillWorkshopProposalEnv,
         collectionReconcile: params.skillWorkshopCollectionReconcile,
       });
-      await tool.execute("read", { action: "read", skill_name: "useful" });
       await tool.execute("reconcile", {
         action: "reconcile",
-        collection: [{ action: "keep", name: "useful" }],
+        collection: [],
       });
       return {};
     });

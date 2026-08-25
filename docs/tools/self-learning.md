@@ -158,8 +158,8 @@ Every learned skill receives these controls:
   already above the cap can only become shorter.
 - **Rollback metadata:** apply records the prior skill and support-file contents
   before the live write.
-- **Collection review:** once a day in `auto` mode, an isolated model session
-  reads the workspace skills. Externally owned skills must be kept; only
+- **Collection review:** once a week in `auto` mode, an isolated model session
+  reads the skills it intends to change. Externally owned skills stay untouched; only
   Workshop-owned paths can be rewritten or dropped. Collection-created skills
   receive automatically applied `create` proposal records.
 - **Collection backup:** review validates and scans every rewrite before changing
@@ -178,7 +178,7 @@ openclaw skills workshop reject <proposal-id> --reason "Not reusable"
 ```
 
 Applied captures remain visible in `openclaw skills workshop list` and retain
-their rollback metadata. The daily collection review can later improve, merge,
+their rollback metadata. The weekly collection review can later improve, merge,
 or remove them. This makes
 approval-free learning reversible and observable rather than silent.
 
@@ -210,15 +210,15 @@ The reviewer reuses the foreground provider, model, and available auth identity,
 with model fallbacks disabled. Provider pricing and data-handling terms apply to
 the additional run.
 
-Daily collection review also uses the configured agent model. It receives the
+Weekly collection review also uses the configured agent model. It receives the
 names, descriptions, and ownership state of eligible workspace skills, then reads each
-complete skill before making one atomic collection change. Disabled and
+skill it intends to change before one atomic call listing only changes. Disabled and
 agent-filtered skills stay untouched. Shared workspaces use the union of each
 agent's allowed skills only when provider, model, and resolved auth identity
 match. Reconciliation must leave every sharing agent at least one visible skill.
 It has no message tool or general agent tools. Skill bodies are treated as
 untrusted evidence, not as instructions. A persisted per-workspace attempt time
-prevents Gateway restarts from repeating a failed or successful review within 24 hours. The
+prevents Gateway restarts from repeating a failed or successful review within 7 days. The
 foreground agent can restore the one retained collection backup when asked to
 undo the cleanup, unless an affected skill changed afterward.
 
@@ -271,7 +271,7 @@ result pending regardless of autonomous mode.
 
 | Setting                                    | Default  | Effect                                                                                                                   |
 | ------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `skills.workshop.autonomous.mode`          | `"auto"` | Chooses capture behavior; `auto` also enables daily collection review.                                                   |
+| `skills.workshop.autonomous.mode`          | `"auto"` | Chooses capture behavior; `auto` also enables weekly collection review.                                                  |
 | `skills.workshop.approvalPolicy`           | `"auto"` | Controls prompts for normal agent-initiated lifecycle calls. It never expands the isolated reviewer tool surface.        |
 | `skills.workshop.maxPending`               | `50`     | Caps pending and quarantined proposals per workspace.                                                                    |
 | `skills.workshop.maxSkillBytes`            | `40000`  | Caps proposal body size in bytes.                                                                                        |

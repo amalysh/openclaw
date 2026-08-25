@@ -23,9 +23,9 @@ import {
 } from "./store-sqlite-schema.js";
 
 const CURATOR_STATE_ID = 1;
-const REVIEW_INTERVAL_MS = 24 * 60 * 60_000;
+const REVIEW_INTERVAL_MS = 7 * 24 * 60 * 60_000;
 const REVIEW_CLAIM_MS = 11 * 60_000;
-// Bound per-workspace history so unattended daily maintenance cannot grow state forever.
+// Bound per-workspace history so unattended weekly maintenance cannot grow state forever.
 const SKILL_COLLECTION_REVIEW_RETENTION_COUNT = 90;
 const SKILL_COLLECTION_REVIEW_HISTORY_LIMIT = 20;
 type CollectionReviewDatabase = Pick<

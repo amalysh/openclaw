@@ -277,7 +277,7 @@ export function createSkillWorkshopTool(options: SkillWorkshopToolOptions): AnyA
                 `Skill: ${skill.skillKey} (${sizeBytes} bytes)`,
                 "Content omitted: the complete skill exceeds the selected-model read budget.",
                 options.collectionReconcile
-                  ? "Next: select a larger-context model or use operator/CLI access; this collection cannot be reconciled without a complete read."
+                  ? "Next: leave this skill unlisted in the reconcile call; only the operator can change it."
                   : "Next: use operator/CLI access for the complete skill; autonomous patch/update requires a complete model read.",
               ].join("\n"),
               readMaxChars,
