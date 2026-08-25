@@ -128,6 +128,58 @@ describe("msteams thread parent context injection", () => {
     );
   });
 
+  it("resolves thread parent context when the channel activity omits replyToId", async () => {
+    fetchChannelMessageMock.mockResolvedValueOnce({
+      id: threadRootId,
+      from: { user: { displayName: "Alice", id: "alice-id" } },
+      body: { content: "Can someone investigate the latency spike?", contentType: "text" },
+    });
+    const { deps, enqueueSystemEvent } = createMessageHandlerDeps(cfg);
+    const handler = createMSTeamsMessageHandler(deps);
+
+    await handler({
+      // Channel replies commonly arrive without replyToId; the thread root is still
+      // recoverable from the conversation id.
+      activity: buildChannelActivity({
+        id: "msg-reply-1",
+        conversation: {
+          id: `${channelConversationId};messageid=${threadRootId}`,
+          conversationType: "channel",
+        },
+      }),
+      sendActivity: vi.fn(async () => undefined),
+    } as unknown as Parameters<typeof handler>[0]);
+
+    expect(fetchChannelMessageMock).toHaveBeenCalledWith(
+      "token",
+      "group-1",
+      channelConversationId,
+      threadRootId,
+      expect.objectContaining({ label: "MS Teams inbound preprocessing" }),
+    );
+    const parentCall = findParentSystemEventCall(enqueueSystemEvent);
+    expect(parentCall?.[0]).toBe("Replying to @Alice: Can someone investigate the latency spike?");
+  });
+
+  it("does not treat a top-level channel post as its own thread parent", async () => {
+    const { deps } = createMessageHandlerDeps(cfg);
+    const handler = createMSTeamsMessageHandler(deps);
+
+    await handler({
+      // A root post carries its own id as the conversation messageid.
+      activity: buildChannelActivity({
+        id: threadRootId,
+        conversation: {
+          id: `${channelConversationId};messageid=${threadRootId}`,
+          conversationType: "channel",
+        },
+      }),
+      sendActivity: vi.fn(async () => undefined),
+    } as unknown as Parameters<typeof handler>[0]);
+
+    expect(fetchChannelMessageMock).not.toHaveBeenCalled();
+  });
+
   it("caches parent fetches across thread replies in the same session", async () => {
     fetchChannelMessageMock.mockResolvedValue({
       id: threadRootId,

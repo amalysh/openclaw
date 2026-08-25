@@ -81,6 +81,7 @@ export function prepareMSTeamsThreadRouting(params: {
   return {
     route,
     deadline,
+    conversationMessageId: params.conversationMessageId,
     resolveTeamAadGroupId,
     getTeamAadGroupId: () => teamAadGroupId,
   };
@@ -102,7 +103,7 @@ export async function resolveMSTeamsThreadContext(params: {
 }) {
   const core = getMSTeamsRuntime();
   const activity = params.context.activity;
-  const { route, deadline } = params.routing;
+  const { route, deadline, conversationMessageId } = params.routing;
   const teamAadGroupId = await params.routing.resolveTeamAadGroupId();
   let quoteBodyFull: string | undefined;
   let quoteSenderId: string | undefined;
@@ -129,7 +130,16 @@ export async function resolveMSTeamsThreadContext(params: {
   }
 
   let threadContext: string | undefined;
-  const threadParentId = activity.replyToId;
+  // Channel activities frequently arrive without `replyToId`, so fall back to the thread
+  // root parsed from the conversation id. `attachments/graph.ts` already resolves the
+  // Graph message URL this way; without the same fallback here, parent and sibling-reply
+  // context never loads for those turns. The self-comparison keeps a top-level post from
+  // being treated as its own parent.
+  const threadParentId =
+    activity.replyToId ??
+    (conversationMessageId && conversationMessageId !== activity.id
+      ? conversationMessageId
+      : undefined);
   if (threadParentId && params.isChannel && teamAadGroupId) {
     try {
       const graphToken = await withMSTeamsRequestDeadline({
