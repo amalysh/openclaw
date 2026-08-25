@@ -1773,6 +1773,7 @@ openclaw-settings-save-indicator:empty {
    here so gateway threads and native coding catalogs cannot drift apart. */
 .sidebar-recent-session {
   --sidebar-child-session-toggle-width: max(34px, calc(36px * var(--control-ui-text-scale)));
+  --sidebar-title-line-height: calc(18px * var(--control-ui-text-scale));
 
   display: flex;
   align-items: center;
@@ -2007,6 +2008,7 @@ openclaw-settings-save-indicator:empty {
 .sidebar-recent-session__name {
   display: block;
   width: 100%;
+  line-height: var(--sidebar-title-line-height);
   flex: 0 0 auto;
   min-width: 0;
   overflow: hidden;
@@ -2089,7 +2091,7 @@ openclaw-settings-save-indicator:empty {
 
 .sidebar-recent-session:not(.sidebar-recent-session--child, .sidebar-recent-session--single-line)
   > .sidebar-recent-session__aside {
-  inset: 13px 2px auto auto;
+  inset: calc(1px + max(24px, var(--sidebar-title-line-height)) / 2) 2px auto auto;
 }
 
 .sidebar-recent-session--child > .sidebar-recent-session__aside {
@@ -4350,7 +4352,7 @@ html:not(.openclaw-native-macos):not(.openclaw-native-nav):not(.openclaw-native-
 
 .sidebar-recent-session:not(.sidebar-recent-session--child, .sidebar-recent-session--single-line)
   .sidebar-recent-session__title-row {
-  height: 24px;
+  height: max(24px, var(--sidebar-title-line-height));
 }
 
 .sidebar-recent-session--single-line .sidebar-recent-session__title-row {

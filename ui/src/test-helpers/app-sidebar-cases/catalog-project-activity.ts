@@ -4,6 +4,52 @@ import { createGateway, createSessions, mountSidebar } from "../app-sidebar.ts";
 import "../../components/app-sidebar.ts";
 
 describe("AppSidebar project session activity", () => {
+  it("preserves catalog menu focus when project groups reorder", async () => {
+    const gateway = createGateway({} as GatewayBrowserClient);
+    const { sidebar } = await mountSidebar(gateway, createSessions("main", ["agent:main:main"]));
+    const sessions = [
+      { threadId: "thread-a", name: "Project A", cwd: "/work/a" },
+      { threadId: "thread-b", name: "Project B", cwd: "/work/b" },
+    ];
+    const setCatalog = async (orderedSessions: typeof sessions) => {
+      sidebar.sessionData.sessionCatalogs = [
+        {
+          id: "codex",
+          label: "Codex",
+          capabilities: { continueSession: true, archive: true },
+          hosts: [
+            {
+              hostId: "gateway:local",
+              label: "Local Codex",
+              kind: "gateway",
+              connected: true,
+              sessions: orderedSessions.map((session) => ({
+                ...session,
+                status: "idle" as const,
+                archived: false,
+                canContinue: true,
+                canArchive: true,
+              })),
+            },
+          ],
+        },
+      ];
+      sidebar.sessionData.requestSessionDataUpdate();
+      await sidebar.updateComplete;
+    };
+    await setCatalog(sessions);
+
+    const menu = sidebar.querySelector<HTMLButtonElement>(
+      '[data-session-key*="thread-a"] [data-catalog-session-menu]',
+    );
+    menu?.focus();
+    expect(document.activeElement).toBe(menu);
+
+    await setCatalog(sessions.toReversed());
+
+    expect(document.activeElement).toBe(menu);
+  });
+
   it("shows thread-style activity indicators", async () => {
     const gateway = createGateway({} as GatewayBrowserClient);
     const { sidebar } = await mountSidebar(gateway, createSessions("main", ["agent:main:main"]));

@@ -1,4 +1,6 @@
 import { html, nothing } from "lit";
+import { keyed } from "lit/directives/keyed.js";
+import { ref } from "lit/directives/ref.js";
 import { repeat } from "lit/directives/repeat.js";
 import type {
   SessionCatalog,
@@ -11,7 +13,11 @@ import { withSidebarNavCollapseIntent } from "../app-session-route-paths.ts";
 import type { ApplicationNavigationOptions } from "../app/context.ts";
 import { t } from "../i18n/index.ts";
 import { formatUiError } from "../lib/format-error.ts";
-import { startHoverMarqueeFromEvent, stopHoverMarqueeFromEvent } from "../lib/hover-marquee.ts";
+import {
+  restartHoverMarqueeIfHovered,
+  startHoverMarqueeFromEvent,
+  stopHoverMarqueeFromEvent,
+} from "../lib/hover-marquee.ts";
 import { handleContextMenuEvent } from "../lib/keyboard-shortcuts.ts";
 import { shouldHandleNavigationClick } from "../lib/navigation-click.ts";
 import { isSessionRunActive } from "../lib/session-run-state.ts";
@@ -79,8 +85,54 @@ type SessionCatalogGroupsParams = {
     y: number,
     trigger?: HTMLElement,
   ) => void;
+  onCatalogMenuTriggerRendered: (key: CatalogSessionKey, element: Element | undefined) => void;
   isMenuOpen: (key: CatalogSessionKey) => boolean;
 };
+
+const CATALOG_CONTROL_SELECTORS = [
+  ".sidebar-recent-session__link",
+  "[data-child-session-toggle]",
+  "[data-sidebar-session-pin]",
+  "[data-catalog-session-menu], [data-session-menu]",
+] as const;
+
+function catalogRowRef(
+  identityKey: string,
+  sessionKey: string,
+  catalogKey: CatalogSessionKey,
+  menuOpen: boolean,
+  params: SessionCatalogGroupsParams,
+): ((element: Element | undefined) => void) | undefined {
+  const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const activeRow = active?.closest<HTMLElement>("[data-session-key]");
+  const selector = CATALOG_CONTROL_SELECTORS.find((candidate) => active?.matches(candidate));
+  const restoreFocus =
+    selector !== undefined &&
+    (activeRow?.dataset.catalogSessionKey === identityKey ||
+      activeRow?.dataset.sessionKey === identityKey ||
+      activeRow?.dataset.sessionKey === sessionKey);
+  if (!menuOpen && !restoreFocus) {
+    return undefined;
+  }
+  return (element) => {
+    if (!(element instanceof HTMLElement)) {
+      return;
+    }
+    if (menuOpen) {
+      params.onCatalogMenuTriggerRendered(
+        catalogKey,
+        element.querySelector(CATALOG_CONTROL_SELECTORS[3]) ?? undefined,
+      );
+    }
+    if (restoreFocus) {
+      queueMicrotask(() => {
+        if (element.isConnected && document.activeElement === document.body) {
+          element.querySelector<HTMLElement>(selector)?.focus({ preventScroll: true });
+        }
+      });
+    }
+  };
+}
 
 function renderSessionRunSpinner(showTitle = true) {
   return html`<span
@@ -406,20 +458,33 @@ function renderCatalogSessionRow(
   const timestamp = normalizeCatalogTimestamp(
     session.recencyAt ?? session.updatedAt ?? session.createdAt,
   );
-  const adoptedRow = session.sessionKey ? liveRowsByKey.get(session.sessionKey) : undefined;
-  if (adoptedRow) {
-    const label = session.name || session.threadId;
-    return params.renderLiveRow(adoptedRow, {
-      label,
-      ...(session.pullRequest ? { pullRequest: session.pullRequest } : {}),
-    });
-  }
   const catalogKey = {
     catalogId: catalog.id,
     hostId: host.hostId,
     threadId: session.threadId,
   } satisfies CatalogSessionKey;
-  const key = session.sessionKey ?? buildCatalogSessionKey(catalogKey);
+  const identityKey = buildCatalogSessionKey(catalogKey);
+  const key = session.sessionKey ?? identityKey;
+  const menuOpen = params.isMenuOpen(catalogKey);
+  const rowRef = catalogRowRef(identityKey, key, catalogKey, menuOpen, params);
+  const adoptedRow = session.sessionKey ? liveRowsByKey.get(session.sessionKey) : undefined;
+  if (adoptedRow) {
+    const label = session.name || session.threadId;
+    return params.renderLiveRow(adoptedRow, {
+      label,
+      catalogIdentityKey: identityKey,
+      marqueeKey: JSON.stringify([
+        label,
+        session.pullRequest,
+        adoptedRow.updatedAt,
+        adoptedRow.hasActiveRun,
+        adoptedRow.unread,
+      ]),
+      catalogMenuOpen: menuOpen,
+      ...(rowRef ? { rowRef } : {}),
+      ...(session.pullRequest ? { pullRequest: session.pullRequest } : {}),
+    });
+  }
   const label = session.name || session.threadId;
   const meta = formatSidebarTimestamp(timestamp);
   const routeId = "chat";
@@ -459,14 +524,24 @@ function renderCatalogSessionRow(
         : null,
       (trigger, x, y) => openMenu(x, y, trigger ?? undefined),
     );
+  const marqueeLabel = keyed(
+    JSON.stringify([label, session.status, session.pullRequest]),
+    html`<span
+      ${ref(restartHoverMarqueeIfHovered)}
+      class="sidebar-recent-session__name hover-marquee"
+      >${label}</span
+    >`,
+  );
   return html`
     <div
+      ${rowRef ? ref(rowRef) : nothing}
       class="sidebar-recent-session session-row-host sidebar-recent-session--single-line ${active
         ? "sidebar-recent-session--active"
         : ""} ${projectChild ? "sidebar-recent-session--catalog-project-child" : ""} ${running
         ? "session-row-host--running"
         : ""}"
       data-session-key=${key}
+      data-catalog-session-key=${identityKey}
       data-session-row-action-count="1"
       role="listitem"
       @contextmenu=${openMenuFromEvent}
@@ -493,9 +568,7 @@ function renderCatalogSessionRow(
       >
         <span class="sidebar-session-indicator"></span>
         <span class="sidebar-recent-session__text">
-          <span class="sidebar-recent-session__title-row">
-            <span class="sidebar-recent-session__name hover-marquee">${label}</span>
-          </span>
+          <span class="sidebar-recent-session__title-row"> ${marqueeLabel} </span>
           <span class="sidebar-recent-session__details">
             <span class="sidebar-recent-session__details-endcap">
               ${renderSessionRowBadges({
@@ -526,7 +599,7 @@ function renderCatalogSessionRow(
             title=${t("chat.sidebar.openSessionMenu")}
             aria-label=${t("chat.sidebar.openSessionMenu")}
             aria-haspopup="menu"
-            aria-expanded=${String(params.isMenuOpen(catalogKey))}
+            aria-expanded=${String(menuOpen)}
             @click=${(event: MouseEvent) => {
               event.stopPropagation();
               const trigger = event.currentTarget as HTMLElement;

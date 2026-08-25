@@ -59,6 +59,20 @@ suite.define(() => {
       expect(subtitleBounds.y).toBeGreaterThan(rowCenter);
       expect(Math.abs(pinBounds.y + pinBounds.height / 2 - rowCenter)).toBeLessThanOrEqual(1);
       expect(Math.abs(menuBounds.y + menuBounds.height / 2 - rowCenter)).toBeLessThanOrEqual(1);
+
+      await page.evaluate(() => {
+        document.documentElement.style.setProperty("--control-ui-text-scale", "1.4");
+      });
+      await expect
+        .poll(async () => {
+          const [title, details] = await Promise.all([
+            row.locator(".sidebar-recent-session__title-row").boundingBox(),
+            row.locator(".sidebar-recent-session__details").boundingBox(),
+          ]);
+          return title && details ? title.y + title.height - details.y : Number.POSITIVE_INFINITY;
+        })
+        .toBeLessThanOrEqual(0.5);
+      await captureUiProof(page, "sidebar-session-text-scale-140.png");
     } finally {
       await context.close();
     }
@@ -224,7 +238,10 @@ suite.define(() => {
       expect(
         Math.abs(forkBounds.y + forkBounds.height / 2 - (nameBounds.y + nameBounds.height / 2)),
       ).toBeLessThanOrEqual(2);
-      expect(nameBounds.y + nameBounds.height / 2).toBeLessThan(pinBounds.y + pinBounds.height / 2);
+      expect(nameBounds.y + nameBounds.height / 2).toBeCloseTo(
+        pinBounds.y + pinBounds.height / 2,
+        1,
+      );
       expect(nameBounds.x + nameBounds.width).toBeLessThanOrEqual(pinBounds.x + 1);
       expect(pinBounds.x + pinBounds.width).toBeLessThanOrEqual(menuBounds.x);
     } finally {
@@ -448,7 +465,10 @@ suite.define(() => {
         throw new Error("Expected visible combined session action geometry");
       }
       expect(textBounds.width).toBeCloseTo(restingTextBounds.width, 1);
-      expect(nameBounds.y + nameBounds.height / 2).toBeLessThan(pinBounds.y + pinBounds.height / 2);
+      expect(nameBounds.y + nameBounds.height / 2).toBeCloseTo(
+        pinBounds.y + pinBounds.height / 2,
+        1,
+      );
       expect(nameBounds.x + nameBounds.width).toBeLessThanOrEqual(pinBounds.x + 1);
       expect(pinBounds.x + pinBounds.width).toBeLessThanOrEqual(menuBounds.x);
       await page.mouse.move(0, 0);
@@ -471,8 +491,9 @@ suite.define(() => {
         throw new Error("Expected visible focused session action geometry");
       }
       expect(focusedTextBounds.width).toBeCloseTo(restingTextBounds.width, 1);
-      expect(focusedNameBounds.y + focusedNameBounds.height / 2).toBeLessThan(
+      expect(focusedNameBounds.y + focusedNameBounds.height / 2).toBeCloseTo(
         focusedPinBounds.y + focusedPinBounds.height / 2,
+        1,
       );
       expect(focusedNameBounds.x + focusedNameBounds.width).toBeLessThanOrEqual(
         focusedPinBounds.x + 1,

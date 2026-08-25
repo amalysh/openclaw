@@ -73,3 +73,15 @@ export function stopHoverMarqueeFromEvent(event: Event): void {
     stopHoverMarquee(event.currentTarget);
   }
 }
+
+export function restartHoverMarqueeIfHovered(element: Element | undefined): void {
+  if (!(element instanceof HTMLElement)) {
+    return;
+  }
+  queueMicrotask(() => {
+    const host = element.isConnected ? element.closest<HTMLElement>(".session-row-host") : null;
+    if (host?.matches(":hover")) {
+      startHoverMarquee(host);
+    }
+  });
+}
