@@ -18,7 +18,6 @@ import {
 } from "../lib/hover-marquee.ts";
 import { handleContextMenuEvent } from "../lib/keyboard-shortcuts.ts";
 import { projectPresencePayload } from "../lib/presence-users.ts";
-import type { CatalogSessionKey } from "../lib/sessions/catalog-key.ts";
 import { writeSessionDragData } from "../lib/sessions/drag.ts";
 import type { SidebarSessionsGrouping } from "../lib/sessions/grouping.ts";
 import type { NewSessionTarget } from "../pages/new-session/location.ts";
@@ -144,7 +143,6 @@ export interface SessionListHost {
     y: number,
     trigger?: HTMLElement,
   ): void;
-  retargetCatalogMenuTrigger(key: CatalogSessionKey, element: Element | undefined): void;
 }
 
 export function visibleSessionChildren(params: {
@@ -197,14 +195,13 @@ export function renderRecentSession(params: {
       : session.owner?.actor
     : undefined;
   const ownerId = ownerActor?.id?.trim();
-  const presenceProjection =
-    ownerId || display?.marqueeKey
-      ? projectPresencePayload(
-          host.sessionData.presencePayload,
-          host.sessionDataContext?.gateway.snapshot.selfUser?.id,
-          host.sessionData.presenceInstanceId,
-        )
-      : undefined;
+  const presenceProjection = ownerId
+    ? projectPresencePayload(
+        host.sessionData.presencePayload,
+        host.sessionDataContext?.gateway.snapshot.selfUser?.id,
+        host.sessionData.presenceInstanceId,
+      )
+    : undefined;
   const ownerViewing = ownerId
     ? presenceProjection?.users.some(
         (user) => user.id === ownerId && user.watchedSessions.includes(session.key),
@@ -251,14 +248,6 @@ export function renderRecentSession(params: {
     host.sessionData.approvalBadgeSnapshot(),
     session.key,
   );
-  const visibleViewerCount = display?.marqueeKey
-    ? (presenceProjection?.users.filter(
-        (user) =>
-          user.id !== presenceProjection.selfUserId &&
-          user.id !== renderedOwnerId &&
-          user.watchedSessions.includes(session.key),
-      ).length ?? 0)
-    : 0;
   const openMenuFromEvent = (event: MouseEvent | KeyboardEvent) =>
     handleContextMenuEvent(
       event,
@@ -303,35 +292,8 @@ export function renderRecentSession(params: {
     requiredScope: "operator.write",
   });
   const rowDraggable = !session.isChild && groupWriteAccess.allowed;
-  // Adopted catalog rows keep their live row node, so replace only the label
-  // whenever live title/endcap geometry changes and remeasure under the pointer.
-  const marqueeKey = display?.marqueeKey
-    ? JSON.stringify([
-        display.marqueeKey,
-        session.archived === true,
-        session.forkSource !== undefined,
-        subtitle ?? null,
-        session.childSessionKeys.length,
-        hasBoard,
-        Math.min(visibleViewerCount, 4),
-        session.incognito === true,
-        session.hasAutomation,
-        pullRequest ?? null,
-        hasApproval,
-        session.outboxAttentionCount ?? 0,
-        session.hasComposerDraft === true,
-        session.placementState ?? null,
-        session.diskSpaceStatus ?? null,
-        session.workspaceConflictCount ?? 0,
-        pullRequestState,
-        running,
-        session.status ?? null,
-        session.unread,
-        hasTrail,
-      ])
-    : undefined;
-  const marqueeLabelTemplate = html`<span
-    ${marqueeKey ? ref(restartHoverMarqueeIfHovered) : nothing}
+  const marqueeLabel = html`<span
+    ${display ? ref((element) => restartHoverMarqueeIfHovered(element)) : nothing}
     class="sidebar-recent-session__name hover-marquee"
     >${session.archived
       ? html`<span
@@ -349,7 +311,6 @@ export function renderRecentSession(params: {
         >`
       : nothing}${label}</span
   >`;
-  const marqueeLabel = marqueeKey ? keyed(marqueeKey, marqueeLabelTemplate) : marqueeLabelTemplate;
   // Always reserve the lead so every title shares the section-label text line.
   const row = html`
     <div
@@ -377,9 +338,6 @@ export function renderRecentSession(params: {
       @mouseleave=${(event: MouseEvent) => stopHoverMarquee(event.currentTarget as HTMLElement)}
     >
       <a
-        ${display?.focusedControl === "link" && display.restoreControlFocus
-          ? ref(display.restoreControlFocus)
-          : nothing}
         href=${withSidebarNavCollapseIntent(session.href)}
         class="sidebar-recent-session__link"
         draggable="false"
@@ -457,9 +415,6 @@ export function renderRecentSession(params: {
       </a>
       ${session.childSessionKeys.length > 0
         ? html`<button
-            ${display?.focusedControl === "child-toggle" && display.restoreControlFocus
-              ? ref(display.restoreControlFocus)
-              : nothing}
             class="sidebar-child-session-toggle ${session.runningChildCount > 0
               ? "sidebar-child-session-toggle--running"
               : session.failedChildCount > 0
@@ -491,9 +446,6 @@ export function renderRecentSession(params: {
           ${session.isChild
             ? nothing
             : html`<button
-                ${display?.focusedControl === "pin" && display.restoreControlFocus
-                  ? ref(display.restoreControlFocus)
-                  : nothing}
                 class="session-action session-action--pin"
                 data-sidebar-session-pin="true"
                 type="button"
@@ -506,10 +458,6 @@ export function renderRecentSession(params: {
               </button>`}
           <openclaw-tooltip .content=${menuTooltip} .describe=${false} .disabled=${menuOpen}>
             <button
-              ${display?.catalogMenuTriggerRef ? ref(display.catalogMenuTriggerRef) : nothing}
-              ${display?.focusedControl === "menu" && display.restoreControlFocus
-                ? ref(display.restoreControlFocus)
-                : nothing}
               class="session-action"
               data-session-menu="true"
               type="button"

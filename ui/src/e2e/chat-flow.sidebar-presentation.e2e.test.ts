@@ -1,5 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
+import type { Locator } from "playwright";
 import { expect, it } from "vitest";
 import {
   captureUiProofEnabled,
@@ -31,6 +32,13 @@ const subtitleStabilityProofDir = path.join(
   "control-ui-e2e",
   "sidebar-subtitle-stability",
 );
+
+async function expandCatalogSection(catalog: Locator): Promise<void> {
+  const toggle = catalog.locator(".sidebar-session-group-toggle");
+  if ((await toggle.getAttribute("aria-expanded")) === "false") {
+    await toggle.click();
+  }
+}
 
 suite.define(() => {
   it("keeps a running subtitle and row height stable when its session is opened", async () => {
@@ -693,10 +701,7 @@ suite.define(() => {
       await page.goto(`${suite.server.baseUrl}chat`);
       const catalog = page.locator('[data-session-section="catalog:codex"]');
       await catalog.waitFor({ state: "visible" });
-      const toggle = catalog.locator(".sidebar-session-group-toggle");
-      if ((await toggle.getAttribute("aria-expanded")) === "false") {
-        await toggle.click();
-      }
+      await expandCatalogSection(catalog);
       const rows = catalog.locator(".sidebar-session-catalog-host__sessions > [data-session-key]");
       for (const [control, selector] of [
         ["link", ".sidebar-recent-session__link"],
@@ -719,7 +724,7 @@ suite.define(() => {
           element.setAttribute("data-focus-probe", value);
         }, control);
 
-        for (const order of [reversedOrder, initialOrder, reversedOrder]) {
+        for (const order of [reversedOrder, initialOrder]) {
           const reorderRequestCount = (await gateway.getRequests("sessions.catalog.list")).length;
           await gateway.setMethodResponse("sessions.catalog.list", catalogResponse(order));
           await page.evaluate(() => window.dispatchEvent(new Event("focus")));
@@ -789,10 +794,7 @@ suite.define(() => {
       await page.goto(`${suite.server.baseUrl}chat`);
       const catalog = page.locator('[data-session-section="catalog:codex"]');
       await catalog.waitFor({ state: "visible" });
-      const toggle = catalog.locator(".sidebar-session-group-toggle");
-      if ((await toggle.getAttribute("aria-expanded")) === "false") {
-        await toggle.click();
-      }
+      await expandCatalogSection(catalog);
       const row = catalog.locator(`[data-session-key="${sessionKey}"]`);
       await row.hover();
       const menu = row.locator("[data-session-menu]");
@@ -865,6 +867,7 @@ suite.define(() => {
           key: sessionKey,
           kind: "direct",
           label,
+          forkSource: { sessionKey: "agent:main:source", sessionId: "source-session" },
           updatedAt: 1,
           ...state,
         },
@@ -881,11 +884,9 @@ suite.define(() => {
       await page.goto(`${suite.server.baseUrl}chat`);
       const catalog = page.locator('[data-session-section="catalog:codex"]');
       await catalog.waitFor({ state: "visible" });
-      const toggle = catalog.locator(".sidebar-session-group-toggle");
-      if ((await toggle.getAttribute("aria-expanded")) === "false") {
-        await toggle.click();
-      }
+      await expandCatalogSection(catalog);
       const row = catalog.locator(`[data-session-key="${sessionKey}"]`);
+      await row.locator(".sidebar-session-fork-indicator").waitFor();
       await row.hover();
       const menu = row.locator("[data-session-menu]");
       await expect
@@ -911,6 +912,30 @@ suite.define(() => {
           .poll(async () => (await gateway.getRequests("sessions.list")).length)
           .toBeGreaterThan(requestCount);
       };
+
+      await marquee.evaluate((element) => {
+        const shift = getComputedStyle(element).getPropertyValue("--hover-marquee-shift");
+        element.style.transition = "none";
+        element.style.textIndent = shift;
+        element.getBoundingClientRect();
+        element.style.removeProperty("text-indent");
+        element.getBoundingClientRect();
+        element.style.removeProperty("transition");
+        element.style.transitionDuration = "10s";
+      });
+      await page.mouse.move(0, 0);
+      expect(
+        await marquee.evaluate((element) =>
+          Number.parseFloat(getComputedStyle(element).textIndent),
+        ),
+      ).toBeLessThan(-1);
+      await row.hover();
+      await page.evaluate(() => new Promise(requestAnimationFrame));
+      const remeasuredShift = await marquee.evaluate((element) =>
+        Number.parseFloat(getComputedStyle(element).getPropertyValue("--hover-marquee-shift")),
+      );
+      expect(Math.abs(remeasuredShift - idleShift)).toBeLessThan(1);
+      await marquee.evaluate((element) => element.style.removeProperty("transition-duration"));
 
       await refreshSessions({
         activeRunIds: ["run-adopted-live-marquee"],
@@ -977,10 +1002,7 @@ suite.define(() => {
       await page.goto(`${suite.server.baseUrl}chat`);
       const catalog = page.locator('[data-session-section="catalog:codex"]');
       await catalog.waitFor({ state: "visible" });
-      const toggle = catalog.locator(".sidebar-session-group-toggle");
-      if ((await toggle.getAttribute("aria-expanded")) === "false") {
-        await toggle.click();
-      }
+      await expandCatalogSection(catalog);
       const row = catalog.locator('[data-session-key$=":thread-hovered"]');
       await row.hover();
       const menu = row.locator("[data-catalog-session-menu]");

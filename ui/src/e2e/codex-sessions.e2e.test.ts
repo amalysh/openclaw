@@ -452,7 +452,7 @@ suite.define(() => {
           .evaluateAll((items) => items.map((item) => item.getAttribute("role"))),
       ).toEqual(["listitem", "listitem"]);
       const openclawProject = section.locator(
-        '[data-session-catalog-project="/Users/dev/openclaw"]',
+        '[data-session-catalog-project="project:/Users/dev/openclaw"]',
       );
       const openclawProjectItem = openclawProject.locator("..");
       const openclawProjectList = openclawProjectItem.locator(":scope > [role=list]");
@@ -568,7 +568,7 @@ suite.define(() => {
       expect(projectLabelTone.distanceToText).toBeLessThan(projectLabelTone.distanceToMuted);
       expect(
         await section
-          .locator('[data-session-catalog-project="/Users/dev/other"]')
+          .locator('[data-session-catalog-project="project:/Users/dev/other"]')
           .locator(".sidebar-session-catalog-project__label")
           .textContent(),
       ).toBe("other");
@@ -658,7 +658,7 @@ suite.define(() => {
           (key) => JSON.parse(localStorage.getItem(key) ?? "[]"),
           collapsedSessionSectionsStorageKey,
         ),
-      ).toContain("catalog-project:codex:gateway:local:/Users/dev/openclaw");
+      ).toContain("catalog-project:codex:gateway:local:project:/Users/dev/openclaw");
 
       await openclawProject.click();
       await expect.poll(() => openclawProject.getAttribute("aria-expanded")).toBe("true");
@@ -669,7 +669,7 @@ suite.define(() => {
           (key) => JSON.parse(localStorage.getItem(key) ?? "[]"),
           collapsedSessionSectionsStorageKey,
         ),
-      ).not.toContain("catalog-project:codex:gateway:local:/Users/dev/openclaw");
+      ).not.toContain("catalog-project:codex:gateway:local:project:/Users/dev/openclaw");
 
       if (captureUiProofEnabled) {
         await mkdir(uiProofArtifactDir, { recursive: true });

@@ -1,5 +1,4 @@
 import { html, nothing } from "lit";
-import { keyed } from "lit/directives/keyed.js";
 import { ref } from "lit/directives/ref.js";
 import { repeat } from "lit/directives/repeat.js";
 import type {
@@ -15,8 +14,8 @@ import { t } from "../i18n/index.ts";
 import { formatUiError } from "../lib/format-error.ts";
 import {
   restartHoverMarqueeIfHovered,
-  startHoverMarqueeFromEvent,
-  stopHoverMarqueeFromEvent,
+  startHoverMarquee,
+  stopHoverMarquee,
 } from "../lib/hover-marquee.ts";
 import { handleContextMenuEvent } from "../lib/keyboard-shortcuts.ts";
 import { shouldHandleNavigationClick } from "../lib/navigation-click.ts";
@@ -85,7 +84,6 @@ type SessionCatalogGroupsParams = {
     y: number,
     trigger?: HTMLElement,
   ) => void;
-  onCatalogMenuTriggerRendered: (key: CatalogSessionKey, element: Element | undefined) => void;
   isMenuOpen: (key: CatalogSessionKey) => boolean;
 };
 
@@ -334,19 +332,6 @@ function renderCatalogSessionRows(
   );
 }
 
-function restoreCatalogControlFocus(element: Element | undefined): void {
-  if (!(element instanceof HTMLAnchorElement || element instanceof HTMLButtonElement)) {
-    return;
-  }
-  // Reordering moves the keyed row through a disconnected state. Restore only
-  // the focus that movement dropped; never override a newer user focus choice.
-  queueMicrotask(() => {
-    if (element.isConnected && document.activeElement === document.body) {
-      element.focus({ preventScroll: true });
-    }
-  });
-}
-
 function renderCatalogHostGroup(
   catalog: SessionCatalog,
   host: SessionCatalogHost,
@@ -461,44 +446,16 @@ function renderCatalogSessionRow(
     threadId: session.threadId,
   } satisfies CatalogSessionKey;
   const catalogMenuOpen = params.isMenuOpen(catalogKey);
-  const catalogMenuTriggerRef = catalogMenuOpen
-    ? (element: Element | undefined) => params.onCatalogMenuTriggerRendered(catalogKey, element)
-    : undefined;
   const identityKey = catalogSessionIdentityKey(catalog, host, session);
   const key = session.sessionKey ?? identityKey;
-  const focusedControl =
-    document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
-  const focusedRow = focusedControl?.closest<HTMLElement>("[data-session-key]");
-  const restoreFocusedControl =
-    focusedRow?.dataset.catalogSessionKey === identityKey ||
-    focusedRow?.dataset.sessionKey === identityKey ||
-    focusedRow?.dataset.sessionKey === key;
-  const focusedControlKind = focusedControl?.matches(".sidebar-recent-session__link")
-    ? "link"
-    : focusedControl?.matches("[data-child-session-toggle]")
-      ? "child-toggle"
-      : focusedControl?.matches("[data-sidebar-session-pin]")
-        ? "pin"
-        : focusedControl?.matches("[data-catalog-session-menu], [data-session-menu]")
-          ? "menu"
-          : undefined;
-  const focusRef =
-    restoreFocusedControl && focusedControlKind
-      ? (element: Element | undefined) => restoreCatalogControlFocus(element)
-      : undefined;
   const label = session.name || session.threadId;
   const adoptedRow = session.sessionKey ? liveRowsByKey.get(session.sessionKey) : undefined;
   if (adoptedRow) {
     return params.renderLiveRow(adoptedRow, {
       label,
       catalogIdentityKey: identityKey,
-      marqueeKey: JSON.stringify([label, session.pullRequest]),
       catalogMenuOpen,
-      ...(catalogMenuTriggerRef ? { catalogMenuTriggerRef } : {}),
       ...(session.pullRequest ? { pullRequest: session.pullRequest } : {}),
-      ...(focusRef && focusedControlKind
-        ? { focusedControl: focusedControlKind, restoreControlFocus: focusRef }
-        : {}),
     });
   }
   const meta = formatSidebarTimestamp(timestamp);
@@ -539,15 +496,11 @@ function renderCatalogSessionRow(
         : null,
       (trigger, x, y) => openMenu(x, y, trigger ?? undefined),
     );
-  // Marquee state lives on the label; reset it without replacing focused row controls.
-  const marqueeLabel = keyed(
-    JSON.stringify([label, session.status, session.pullRequest]),
-    html`<span
-      ${ref(restartHoverMarqueeIfHovered)}
-      class="sidebar-recent-session__name hover-marquee"
-      >${label}</span
-    >`,
-  );
+  const marqueeLabel = html`<span
+    ${ref((element) => restartHoverMarqueeIfHovered(element))}
+    class="sidebar-recent-session__name hover-marquee"
+    >${label}</span
+  >`;
   const row = html`
     <div
       class="sidebar-recent-session session-row-host sidebar-recent-session--single-line ${active
@@ -561,11 +514,18 @@ function renderCatalogSessionRow(
       role="listitem"
       @contextmenu=${openMenuFromEvent}
       @keydown=${openMenuFromEvent}
-      @mouseenter=${startHoverMarqueeFromEvent}
-      @mouseleave=${stopHoverMarqueeFromEvent}
+      @mouseenter=${(event: MouseEvent) => {
+        if (event.currentTarget instanceof HTMLElement) {
+          startHoverMarquee(event.currentTarget);
+        }
+      }}
+      @mouseleave=${(event: MouseEvent) => {
+        if (event.currentTarget instanceof HTMLElement) {
+          stopHoverMarquee(event.currentTarget);
+        }
+      }}
     >
       <a
-        ${focusedControlKind === "link" && focusRef ? ref(focusRef) : nothing}
         href=${withSidebarNavCollapseIntent(href)}
         class="sidebar-recent-session__link"
         aria-current=${active ? "page" : nothing}
@@ -609,8 +569,6 @@ function renderCatalogSessionRow(
       <span class="sidebar-recent-session__aside session-row-aside">
         <span class="session-row-actions">
           <button
-            ${catalogMenuTriggerRef ? ref(catalogMenuTriggerRef) : nothing}
-            ${focusedControlKind === "menu" && focusRef ? ref(focusRef) : nothing}
             class="session-action"
             data-catalog-session-menu="true"
             type="button"

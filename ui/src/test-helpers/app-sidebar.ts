@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, vi } from "vitest";
 import type {
   PreservedSessionWorktree,
+  SessionCatalogSession,
   SessionCatalogPullRequestSummary,
   SessionsCatalogListResult,
   SessionsPatchManyParams,
@@ -573,7 +574,9 @@ export const manyAgents = (count: number) =>
   }) as AgentsListResult;
 
 export const catalogPage = (
-  sessions: Array<{ threadId: string; name: string; sessionKey?: string }>,
+  sessions: Array<
+    Pick<SessionCatalogSession, "threadId" | "name" | "sessionKey" | "cwd" | "customGroup">
+  >,
   nextCursor?: string,
   catalogId = "codex",
 ): SessionsCatalogListResult => ({

@@ -18,8 +18,8 @@ function buildRow(params: { textWidth: number; labelWidth: number }) {
   viewport.append(label);
   row.append(viewport);
   document.body.append(row);
-  Object.defineProperty(label, "clientWidth", { value: params.labelWidth });
-  Object.defineProperty(label, "scrollWidth", { value: params.textWidth });
+  Object.defineProperty(label, "clientWidth", { configurable: true, value: params.labelWidth });
+  Object.defineProperty(label, "scrollWidth", { configurable: true, value: params.textWidth });
   return { row, viewport, label };
 }
 
@@ -73,6 +73,51 @@ describe("hover marquee", () => {
     runPendingFrame();
     vi.advanceTimersByTime(250);
     expect(label.classList.contains("hover-marquee--scrolling")).toBe(true);
+  });
+
+  it("remeasures changed geometry while the same label stays hovered", () => {
+    const { row, label } = buildRow({ textWidth: 320, labelWidth: 180 });
+    startHoverMarquee(row);
+    runPendingFrame();
+    vi.advanceTimersByTime(250);
+
+    Object.defineProperty(label, "scrollWidth", { configurable: true, value: 360 });
+    startHoverMarquee(row);
+    runPendingFrame();
+    expect(label.style.getPropertyValue("--hover-marquee-shift")).toBe("-180px");
+    vi.advanceTimersByTime(250);
+    expect(label.classList.contains("hover-marquee--scrolling")).toBe(true);
+
+    Object.defineProperty(label, "scrollWidth", { configurable: true, value: 120 });
+    startHoverMarquee(row);
+    runPendingFrame();
+    expect(label.classList.contains("hover-marquee--scrolling")).toBe(false);
+  });
+
+  it("measures natural content width after an indented label starts scrolling", () => {
+    const { row, label } = buildRow({ textWidth: 320, labelWidth: 180 });
+    const range = document.createRange();
+    let animatedIndent = 0;
+    Object.defineProperty(range, "getBoundingClientRect", {
+      configurable: true,
+      value: vi.fn(
+        () =>
+          ({
+            width:
+              320 - (label.style.getPropertyValue("transition") === "none" ? 0 : animatedIndent),
+          }) as DOMRect,
+      ),
+    });
+    vi.spyOn(document, "createRange").mockReturnValue(range);
+    startHoverMarquee(row);
+    runPendingFrame();
+    expect(label.style.getPropertyValue("--hover-marquee-shift")).toBe("-140px");
+
+    label.style.textIndent = "-140px";
+    animatedIndent = -140;
+    startHoverMarquee(row);
+    runPendingFrame();
+    expect(label.style.getPropertyValue("--hover-marquee-shift")).toBe("-140px");
   });
 
   it("cancels measurement when hover ends before the next frame", () => {

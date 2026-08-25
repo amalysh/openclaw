@@ -83,7 +83,7 @@ suite.define(() => {
               elements.map((element) => element.getAttribute("data-session-catalog-project")),
             ),
         )
-        .toEqual(["/work/project-b", "/work/project-a"]);
+        .toEqual(["project:/work/project-b", "project:/work/project-a"]);
       expect(await row.getAttribute("data-identity-probe")).toBe("kept");
       await expect
         .poll(() => menu.evaluate((element) => element === document.activeElement))

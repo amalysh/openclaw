@@ -22,14 +22,15 @@ export function groupCatalogSessionsByProject(sessions: readonly SessionCatalogS
   // order depend on the roster's sort.
   const customGroups: CatalogProjectGroup[] = [];
   const projectGroups: CatalogProjectGroup[] = [];
-  const groupsByPath = new Map<string, CatalogProjectGroup>();
+  const customGroupsByName = new Map<string, CatalogProjectGroup>();
+  const projectGroupsByPath = new Map<string, CatalogProjectGroup>();
   const ungrouped: SessionCatalogSession[] = [];
 
   for (const session of sessions) {
     const customGroup = session.customGroup?.trim();
     if (customGroup) {
       const key = `custom:${customGroup}`;
-      let group = groupsByPath.get(key);
+      let group = customGroupsByName.get(customGroup);
       if (!group) {
         group = {
           key,
@@ -37,7 +38,7 @@ export function groupCatalogSessionsByProject(sessions: readonly SessionCatalogS
           title: `Custom group: ${customGroup}`,
           sessions: [],
         };
-        groupsByPath.set(key, group);
+        customGroupsByName.set(customGroup, group);
         customGroups.push(group);
       }
       group.sessions.push(session);
@@ -58,15 +59,15 @@ export function groupCatalogSessionsByProject(sessions: readonly SessionCatalogS
       ungrouped.push(session);
       continue;
     }
-    let group = groupsByPath.get(projectPath);
+    let group = projectGroupsByPath.get(projectPath);
     if (!group) {
       group = {
-        key: projectPath,
+        key: `project:${projectPath}`,
         label: projectPath.split(/[\\/]/).at(-1) || projectPath,
         title: projectPath,
         sessions: [],
       };
-      groupsByPath.set(projectPath, group);
+      projectGroupsByPath.set(projectPath, group);
       projectGroups.push(group);
     }
     group.sessions.push(session);

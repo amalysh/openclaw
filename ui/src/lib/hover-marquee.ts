@@ -6,9 +6,9 @@
 const MARQUEE_SPEED_PX_PER_SEC = 80;
 const MARQUEE_MIN_DURATION_MS = 300;
 const MARQUEE_HOVER_DELAY_MS = 500;
-type PendingMarquee = { frame: number; timer?: number };
+type MarqueeState = { frame?: number; timer?: number };
 
-const pendingMarquees = new WeakMap<HTMLElement, PendingMarquee>();
+const marqueeStates = new WeakMap<HTMLElement, MarqueeState>();
 
 function findMarqueeLabel(host: HTMLElement): HTMLElement | null {
   return host.classList.contains("hover-marquee")
@@ -34,58 +34,105 @@ function getMarqueeViewportWidth(label: HTMLElement, host: HTMLElement): number 
   return width;
 }
 
-function clearPendingMarquee(label: HTMLElement): void {
-  const pending = pendingMarquees.get(label);
-  if (pending === undefined) {
+function getMarqueeContentWidth(label: HTMLElement): number {
+  const range = document.createRange();
+  range.selectNodeContents(label);
+  // Range geometry includes a negative text-indent when the label has inline
+  // glyphs. Disable its transition and measure at rest so repeated renders
+  // cannot compound the shift.
+  const inlineIndent = label.style.getPropertyValue("text-indent");
+  const inlineIndentPriority = label.style.getPropertyPriority("text-indent");
+  const inlineTransition = label.style.getPropertyValue("transition");
+  const inlineTransitionPriority = label.style.getPropertyPriority("transition");
+  label.style.setProperty("transition", "none", "important");
+  label.style.setProperty("text-indent", "0px", "important");
+  let rangeWidth = 0;
+  try {
+    const indent = Number.parseFloat(getComputedStyle(label).textIndent) || 0;
+    if (Math.abs(indent) < 0.5) {
+      rangeWidth = range.getBoundingClientRect?.().width ?? 0;
+    }
+  } finally {
+    if (inlineIndent) {
+      label.style.setProperty("text-indent", inlineIndent, inlineIndentPriority);
+    } else {
+      label.style.removeProperty("text-indent");
+    }
+    label.getBoundingClientRect();
+    if (inlineTransition) {
+      label.style.setProperty("transition", inlineTransition, inlineTransitionPriority);
+    } else {
+      label.style.removeProperty("transition");
+    }
+  }
+  if (rangeWidth > 0) {
+    return rangeWidth;
+  }
+  // DOM shims do not lay out ranges. Their mocked scrollWidth can still model
+  // a mid-transition negative indent, which reduces the reported width.
+  const indent = Number.parseFloat(getComputedStyle(label).textIndent) || 0;
+  return label.scrollWidth - indent;
+}
+
+function clearMarquee(label: HTMLElement): void {
+  const state = marqueeStates.get(label);
+  if (state === undefined) {
     return;
   }
-  window.cancelAnimationFrame(pending.frame);
-  if (pending.timer !== undefined) {
-    window.clearTimeout(pending.timer);
+  if (state.frame !== undefined) {
+    window.cancelAnimationFrame(state.frame);
   }
-  pendingMarquees.delete(label);
+  if (state.timer !== undefined) {
+    window.clearTimeout(state.timer);
+  }
+  marqueeStates.delete(label);
 }
 
 export function startHoverMarquee(host: HTMLElement): void {
   const label = findMarqueeLabel(host);
-  if (
-    !label ||
-    label.classList.contains("hover-marquee--scrolling") ||
-    pendingMarquees.has(label)
-  ) {
+  if (!label) {
     return;
   }
-  // Catalog renders can reconnect refs while the pointer stays on the row.
-  // Preserve this label's delay; keyed label replacements get fresh state.
+  const state = marqueeStates.get(label) ?? {};
+  if (state.frame !== undefined) {
+    return;
+  }
+  marqueeStates.set(label, state);
   // Mouseenter fires before hover-only actions finish affecting layout. Measure
   // on the next frame so the marquee sees the width the user actually sees.
-  const pending: PendingMarquee = {
-    frame: window.requestAnimationFrame(() => {
-      if (pendingMarquees.get(label) !== pending) {
-        return;
+  state.frame = window.requestAnimationFrame(() => {
+    if (marqueeStates.get(label) !== state) {
+      return;
+    }
+    state.frame = undefined;
+    const shift = getMarqueeContentWidth(label) - getMarqueeViewportWidth(label, host);
+    if (shift <= 1) {
+      if (state.timer !== undefined) {
+        window.clearTimeout(state.timer);
       }
-      // A negative mid-transition indent (re-hover while snapping back) shrinks
-      // scrollWidth; add it back when calculating the clipped distance.
-      const indent = Number.parseFloat(getComputedStyle(label).textIndent) || 0;
-      const shift = label.scrollWidth - indent - getMarqueeViewportWidth(label, host);
-      if (shift <= 1) {
-        pendingMarquees.delete(label);
-        return;
-      }
-      const durationMs = Math.max(
-        MARQUEE_MIN_DURATION_MS,
-        Math.round((shift / MARQUEE_SPEED_PX_PER_SEC) * 1000),
-      );
-      label.style.setProperty("--hover-marquee-shift", `${-shift}px`);
-      label.style.setProperty("--hover-marquee-duration", `${durationMs}ms`);
+      marqueeStates.delete(label);
+      label.classList.remove("hover-marquee--scrolling");
+      label.style.removeProperty("--hover-marquee-shift");
+      label.style.removeProperty("--hover-marquee-duration");
+      return;
+    }
+    const durationMs = Math.max(
+      MARQUEE_MIN_DURATION_MS,
+      Math.round((shift / MARQUEE_SPEED_PX_PER_SEC) * 1000),
+    );
+    label.style.setProperty("--hover-marquee-shift", `${-shift}px`);
+    label.style.setProperty("--hover-marquee-duration", `${durationMs}ms`);
+    if (state.timer === undefined && !label.classList.contains("hover-marquee--scrolling")) {
       // Keep quick pointer passes quiet; leaving before the timer fires cancels it.
-      pending.timer = window.setTimeout(() => {
-        pendingMarquees.delete(label);
+      state.timer = window.setTimeout(() => {
+        if (marqueeStates.get(label) !== state) {
+          return;
+        }
+        state.timer = undefined;
         label.classList.add("hover-marquee--scrolling");
       }, MARQUEE_HOVER_DELAY_MS);
-    }),
-  };
-  pendingMarquees.set(label, pending);
+    }
+  });
 }
 
 export function stopHoverMarquee(host: HTMLElement): void {
@@ -93,7 +140,7 @@ export function stopHoverMarquee(host: HTMLElement): void {
   if (!label) {
     return;
   }
-  clearPendingMarquee(label);
+  clearMarquee(label);
   label.classList.remove("hover-marquee--scrolling");
 }
 
@@ -109,16 +156,4 @@ export function restartHoverMarqueeIfHovered(element: Element | undefined): void
       startHoverMarquee(host);
     }
   });
-}
-
-export function startHoverMarqueeFromEvent(event: Event): void {
-  if (event.currentTarget instanceof HTMLElement) {
-    startHoverMarquee(event.currentTarget);
-  }
-}
-
-export function stopHoverMarqueeFromEvent(event: Event): void {
-  if (event.currentTarget instanceof HTMLElement) {
-    stopHoverMarquee(event.currentTarget);
-  }
 }
