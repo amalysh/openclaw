@@ -153,6 +153,29 @@ describe("sendWebhookMessageDiscord proxy support", () => {
     globalFetchMock.mockRestore();
   });
 
+  it("does not rewrite webhook mentions inside unterminated inline code", async () => {
+    const globalFetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(JSON.stringify({ id: "msg-code" }), { status: 200 }));
+
+    await sendWebhookMessageDiscord("Run `notify @OpsLead", {
+      cfg: {
+        channels: {
+          discord: {
+            token: "Bot test-token",
+            mentionAliases: { opslead: "123456789012345678" },
+          },
+        },
+      } as OpenClawConfig,
+      accountId: "default",
+      webhookId: "123",
+      webhookToken: "abc",
+      wait: true,
+    });
+
+    expect(globalFetchMock.mock.calls[0]?.[1]?.body).toContain('"content":"Run `notify @OpsLead"');
+  });
+
   it("accepts Discord's no-body webhook response when wait is false", async () => {
     const response = new Response(null, { status: 204 });
     const jsonSpy = vi.spyOn(response, "json");
