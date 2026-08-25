@@ -195,6 +195,42 @@ describe("skill_workshop review mode", () => {
     expect(proposalMutationBudget.remaining).toBe(0);
   });
 
+  it("keeps a user-authored update pending when detached review tries to apply it", async () => {
+    const workspaceDir = await tempDirs.make("openclaw-skill-workshop-review-apply-");
+    const skillName = "operator-runbook";
+    const skillFile = path.join(workspaceDir, "skills", skillName, "SKILL.md");
+    await writeWorkspaceSkills(workspaceDir, [
+      {
+        name: skillName,
+        description: "Run an operator-owned procedure",
+        body: "# Operator Runbook\n\nCheck the old prerequisite.\n",
+      },
+    ]);
+    const reviewTool = createSkillWorkshopTool({
+      workspaceDir,
+      env: testState.env,
+      proposalOnly: true,
+      updateProposals: true,
+      proposalMutationBudget: { remaining: 1 },
+    });
+    await reviewTool.execute("review-read", { action: "read", skill_name: skillName });
+    const patched = await reviewTool.execute("review-patch", {
+      action: "patch",
+      skill_name: skillName,
+      old_string: "Check the old prerequisite.",
+      new_string: "Check the current prerequisite.",
+    });
+    const proposalId = (patched.details as { id: string }).id;
+
+    await expect(
+      reviewTool.execute("review-apply", { action: "apply", proposal_id: proposalId }),
+    ).rejects.toThrow("review allows only");
+
+    const record = await readSkillProposalRecord(proposalId, { env: testState.env });
+    expect(record?.status).toBe("pending");
+    await expect(fs.readFile(skillFile, "utf8")).resolves.toContain("old prerequisite");
+  });
+
   it("composes patch proposals by replacing the quoted span of the live body", async () => {
     const workspaceDir = await tempDirs.make("openclaw-skill-workshop-review-extend-");
     await seedLiveSkill(
