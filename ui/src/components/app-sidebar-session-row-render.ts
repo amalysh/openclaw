@@ -303,7 +303,7 @@ export function renderRecentSession(params: {
       : nothing}${label}</span
   >`;
   const marqueeLabel = display
-    ? keyed(display.marqueeKey, marqueeLabelTemplate)
+    ? keyed(JSON.stringify([display.marqueeKey, session.pullRequest]), marqueeLabelTemplate)
     : marqueeLabelTemplate;
   // Always reserve the lead so every title shares the section-label text line.
   const row = html`

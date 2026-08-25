@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { GatewayBrowserClient } from "../../api/gateway.ts";
-import { catalogPage, createGateway, createSessions, mountSidebar } from "../app-sidebar.ts";
+import {
+  catalogPage,
+  createGateway,
+  createSessions,
+  createSessionsHarness,
+  mountSidebar,
+} from "../app-sidebar.ts";
 import "../../components/app-sidebar.ts";
 
 describe("AppSidebar catalog row lifecycle", () => {
@@ -59,5 +65,29 @@ describe("AppSidebar catalog row lifecycle", () => {
     expect(updatedLabel).not.toBe(oldLabel);
     expect(updatedLabel?.classList.contains("hover-marquee--scrolling")).toBe(false);
     expect(updatedLabel?.style.getPropertyValue("--hover-marquee-shift")).toBe("");
+  });
+
+  it("clears adopted marquee state when its live pull request appears", async () => {
+    const adoptedKey = "agent:main:adopted-pull-request";
+    const gateway = createGateway({} as GatewayBrowserClient);
+    const sessions = createSessionsHarness("main", ["agent:main:main", adoptedKey]);
+    const { sidebar } = await mountSidebar(gateway, sessions.sessions);
+    sidebar.sessionData.sessionCatalogs = catalogPage([
+      { threadId: "thread-adopted-pr", name: "Adopted session", sessionKey: adoptedKey },
+    ]).catalogs;
+    sidebar.sessionData.requestSessionDataUpdate();
+    await sidebar.updateComplete;
+
+    const row = sidebar.querySelector<HTMLElement>(`[data-session-key="${adoptedKey}"]`);
+    const oldLabel = row?.querySelector<HTMLElement>(".hover-marquee");
+    oldLabel?.classList.add("hover-marquee--scrolling");
+    oldLabel?.style.setProperty("--hover-marquee-shift", "-80px");
+    sessions.sessions.setPullRequestSummary(adoptedKey, { numbers: [125820], state: "open" });
+    await sidebar.updateComplete;
+
+    const updatedLabel = row?.querySelector<HTMLElement>(".hover-marquee");
+    expect(updatedLabel).not.toBe(oldLabel);
+    expect(updatedLabel?.classList.contains("hover-marquee--scrolling")).toBe(false);
+    expect(row?.querySelector(".session-row-badge--pull-request")).not.toBeNull();
   });
 });
