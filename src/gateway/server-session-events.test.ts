@@ -487,11 +487,13 @@ describe("createTranscriptUpdateBroadcastHandler", () => {
     expect(payload).not.toHaveProperty("session.thinkingDefault");
   });
 
-  it("emits an explicit null when the thinking override is cleared", async () => {
+  it("emits explicit tombstones in transcript snapshots", async () => {
     sessionRow.thinkingLevel = undefined;
 
     await expect(emitAssistantTranscriptUpdate(false)).resolves.toMatchObject({
-      session: { thinkingLevel: null },
+      agentStatus: null,
+      observerDigest: null,
+      session: { thinkingLevel: null, agentStatus: null, observerDigest: null },
     });
   });
 
