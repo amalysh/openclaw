@@ -18,6 +18,7 @@ import {
   requireRecord,
   requireMockCall,
   expectMockCallArgFields,
+  initialFallbackAttemptOptions,
   createMinimalRunAgentTurnParams,
 } from "./agent-runner-execution.test-support.js";
 import type { FallbackRunnerParams } from "./agent-runner-execution.test-support.js";
@@ -29,7 +30,11 @@ describe("executeAgentTurn: CLI session routing", () => {
   it("carries prepared model context facts into CLI execution", async () => {
     state.isCliProviderMock.mockReturnValue(true);
     state.runWithModelFallbackMock.mockImplementationOnce(async (params: FallbackRunnerParams) => ({
-      result: await params.run("claude-cli", "claude-sonnet-4-6"),
+      result: await params.run(
+        "claude-cli",
+        "claude-sonnet-4-6",
+        initialFallbackAttemptOptions(params),
+      ),
       provider: "claude-cli",
       model: "claude-sonnet-4-6",
       attempts: [],
@@ -71,7 +76,11 @@ describe("executeAgentTurn: CLI session routing", () => {
   it("preserves queued image fields from runs created before the prepared marker", async () => {
     state.isCliProviderMock.mockReturnValue(true);
     state.runWithModelFallbackMock.mockImplementationOnce(async (params: FallbackRunnerParams) => ({
-      result: await params.run("claude-cli", "claude-opus-5"),
+      result: await params.run(
+        "claude-cli",
+        "claude-opus-5",
+        initialFallbackAttemptOptions(params),
+      ),
       provider: "claude-cli",
       model: "claude-opus-5",
       attempts: [],
@@ -115,7 +124,11 @@ describe("executeAgentTurn: CLI session routing", () => {
   it("keeps prepared current-turn images aligned with CLI media facts", async () => {
     state.isCliProviderMock.mockReturnValue(true);
     state.runWithModelFallbackMock.mockImplementationOnce(async (params: FallbackRunnerParams) => ({
-      result: await params.run("claude-cli", "claude-opus-5"),
+      result: await params.run(
+        "claude-cli",
+        "claude-opus-5",
+        initialFallbackAttemptOptions(params),
+      ),
       provider: "claude-cli",
       model: "claude-opus-5",
       attempts: [],
@@ -212,7 +225,7 @@ describe("executeAgentTurn: CLI session routing", () => {
   it("forwards the static extra system prompt to CLI backends", async () => {
     state.isCliProviderMock.mockReturnValue(true);
     state.runWithModelFallbackMock.mockImplementationOnce(async (params: FallbackRunnerParams) => ({
-      result: await params.run("codex-cli", "gpt-5.4"),
+      result: await params.run("codex-cli", "gpt-5.4", initialFallbackAttemptOptions(params)),
       provider: "codex-cli",
       model: "gpt-5.4",
       attempts: [],
@@ -294,7 +307,11 @@ describe("executeAgentTurn: CLI session routing", () => {
   it("passes silent empty-reply policy to CLI backends for message-tool-only turns", async () => {
     state.isCliProviderMock.mockReturnValue(true);
     state.runWithModelFallbackMock.mockImplementationOnce(async (params: FallbackRunnerParams) => ({
-      result: await params.run("claude-cli", "claude-sonnet-4-6"),
+      result: await params.run(
+        "claude-cli",
+        "claude-sonnet-4-6",
+        initialFallbackAttemptOptions(params),
+      ),
       provider: "claude-cli",
       model: "claude-sonnet-4-6",
       attempts: [],
@@ -337,7 +354,7 @@ describe("executeAgentTurn: CLI session routing", () => {
   it("passes prepared CLI user turns to the runtime persistence boundary", async () => {
     state.isCliProviderMock.mockReturnValue(true);
     state.runWithModelFallbackMock.mockImplementationOnce(async (params: FallbackRunnerParams) => ({
-      result: await params.run("codex-cli", "gpt-5.4"),
+      result: await params.run("codex-cli", "gpt-5.4", initialFallbackAttemptOptions(params)),
       provider: "codex-cli",
       model: "gpt-5.4",
       attempts: [],
@@ -404,7 +421,7 @@ describe("executeAgentTurn: CLI session routing", () => {
   it("reuses CLI sessions for room-event turns", async () => {
     state.isCliProviderMock.mockReturnValue(true);
     state.runWithModelFallbackMock.mockImplementationOnce(async (params: FallbackRunnerParams) => ({
-      result: await params.run("codex-cli", "gpt-5.4"),
+      result: await params.run("codex-cli", "gpt-5.4", initialFallbackAttemptOptions(params)),
       provider: "codex-cli",
       model: "gpt-5.4",
       attempts: [],
@@ -462,7 +479,7 @@ describe("executeAgentTurn: CLI session routing", () => {
   it("keeps the first CLI session created by a room-event turn", async () => {
     state.isCliProviderMock.mockReturnValue(true);
     state.runWithModelFallbackMock.mockImplementationOnce(async (params: FallbackRunnerParams) => ({
-      result: await params.run("codex-cli", "gpt-5.4"),
+      result: await params.run("codex-cli", "gpt-5.4", initialFallbackAttemptOptions(params)),
       provider: "codex-cli",
       model: "gpt-5.4",
       attempts: [],
@@ -511,7 +528,7 @@ describe("executeAgentTurn: CLI session routing", () => {
   it("drops replacement room-event CLI sessions when reuse fails", async () => {
     state.isCliProviderMock.mockReturnValue(true);
     state.runWithModelFallbackMock.mockImplementationOnce(async (params: FallbackRunnerParams) => ({
-      result: await params.run("codex-cli", "gpt-5.4"),
+      result: await params.run("codex-cli", "gpt-5.4", initialFallbackAttemptOptions(params)),
       provider: "codex-cli",
       model: "gpt-5.4",
       attempts: [],
@@ -568,7 +585,7 @@ describe("executeAgentTurn: CLI session routing", () => {
   it("keeps room-event CLI bindings when synthetic hooks return no CLI binding", async () => {
     state.isCliProviderMock.mockReturnValue(true);
     state.runWithModelFallbackMock.mockImplementationOnce(async (params: FallbackRunnerParams) => ({
-      result: await params.run("codex-cli", "gpt-5.4"),
+      result: await params.run("codex-cli", "gpt-5.4", initialFallbackAttemptOptions(params)),
       provider: "codex-cli",
       model: "gpt-5.4",
       attempts: [],
@@ -616,7 +633,7 @@ describe("executeAgentTurn: CLI session routing", () => {
   it("clears room-event CLI bindings when an unflushed replacement is dropped", async () => {
     state.isCliProviderMock.mockReturnValue(true);
     state.runWithModelFallbackMock.mockImplementationOnce(async (params: FallbackRunnerParams) => ({
-      result: await params.run("codex-cli", "gpt-5.4"),
+      result: await params.run("codex-cli", "gpt-5.4", initialFallbackAttemptOptions(params)),
       provider: "codex-cli",
       model: "gpt-5.4",
       attempts: [],
@@ -664,7 +681,11 @@ describe("executeAgentTurn: CLI session routing", () => {
   it("clears a fork-marked Claude CLI binding when the channel turn fails", async () => {
     state.isCliProviderMock.mockReturnValue(true);
     state.runWithModelFallbackMock.mockImplementationOnce(async (params: FallbackRunnerParams) => ({
-      result: await params.run("claude-cli", "claude-opus-4-8"),
+      result: await params.run(
+        "claude-cli",
+        "claude-opus-4-8",
+        initialFallbackAttemptOptions(params),
+      ),
       provider: "claude-cli",
       model: "claude-opus-4-8",
       attempts: [],
@@ -708,7 +729,11 @@ describe("executeAgentTurn: CLI session routing", () => {
     const sessionKey = "agent:main:cron:media-job:run:run-1";
     state.isCliProviderMock.mockReturnValue(true);
     state.runWithModelFallbackMock.mockImplementationOnce(async (params: FallbackRunnerParams) => ({
-      result: await params.run("claude-cli", "claude-opus-4-8"),
+      result: await params.run(
+        "claude-cli",
+        "claude-opus-4-8",
+        initialFallbackAttemptOptions(params),
+      ),
       provider: "claude-cli",
       model: "claude-opus-4-8",
       attempts: [],
@@ -748,7 +773,11 @@ describe("executeAgentTurn: CLI session routing", () => {
     const sessionKey = "agent:main:cron:media-job:run:run-queued";
     state.isCliProviderMock.mockReturnValue(true);
     state.runWithModelFallbackMock.mockImplementationOnce(async (params: FallbackRunnerParams) => ({
-      result: await params.run("claude-cli", "claude-opus-4-8"),
+      result: await params.run(
+        "claude-cli",
+        "claude-opus-4-8",
+        initialFallbackAttemptOptions(params),
+      ),
       provider: "claude-cli",
       model: "claude-opus-4-8",
       attempts: [],
@@ -816,7 +845,11 @@ describe("executeAgentTurn: CLI session routing", () => {
   it("clears a reused binding after the CLI reports an expired session", async () => {
     state.isCliProviderMock.mockReturnValue(true);
     state.runWithModelFallbackMock.mockImplementationOnce(async (params: FallbackRunnerParams) => ({
-      result: await params.run("claude-cli", "claude-opus-4-8"),
+      result: await params.run(
+        "claude-cli",
+        "claude-opus-4-8",
+        initialFallbackAttemptOptions(params),
+      ),
       provider: "claude-cli",
       model: "claude-opus-4-8",
       attempts: [],
