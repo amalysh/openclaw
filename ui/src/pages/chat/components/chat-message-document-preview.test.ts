@@ -90,7 +90,6 @@ describe("parseDelimitedPreview", () => {
       renderAttachmentDocumentPreview(
         "table",
         documentAttachment("wide.csv", "text/csv").attachment,
-        "https://example.com/wide.csv",
         wideCsv,
         undefined,
       ),

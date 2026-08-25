@@ -299,9 +299,10 @@ class ChatAudioPlayer extends OpenClawLightDomContentsElement {
       return;
     }
     if (!this.releaseWaveformBlob) {
-      const cached = retainCachedChatAudioBlob(this.resolveWaveformCacheKey());
+      const cacheKey = this.resolveWaveformCacheKey();
+      const cached = retainCachedChatAudioBlob(cacheKey);
       if (cached) {
-        this.applyPreparedAudio(this.resolveWaveformCacheKey(), cached);
+        this.applyPreparedAudio(cacheKey, cached);
       }
     }
     this.sourceController.applyPendingSource(media);
@@ -557,7 +558,6 @@ class ChatAudioPlayer extends OpenClawLightDomContentsElement {
           mimeType: this.mimeType,
           sizeBytes: this.sizeBytes,
           downloadHref,
-          showExpandAction: true,
           onExpand: this.onExpand,
           visualMode: failed ? "large-placeholder" : "preview-with-favicon",
           voiceNote: this.voiceNote,

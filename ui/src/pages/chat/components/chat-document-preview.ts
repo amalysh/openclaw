@@ -105,7 +105,6 @@ class ChatDocumentPreview extends OpenClawLightDomContentsElement {
       ${renderAttachmentDocumentPreview(
         this.previewKind,
         this.attachment,
-        this.attachmentUrl,
         previewText,
         frameState,
       )}

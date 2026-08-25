@@ -101,23 +101,23 @@ class ChatSvgAttachment extends OpenClawLightDomContentsElement {
           mimeType: this.mimeType,
           sizeBytes: this.sizeBytes,
           downloadHref: this.downloadHref,
-          showExpandAction: true,
           onExpand: this.onExpand,
           visualMode: "large-placeholder",
         })}
       </div>`;
     }
-    if (!this.blobUrl) {
+    const blobUrl = this.blobUrl;
+    if (!blobUrl) {
       return nothing;
     }
     return html`<button
       type="button"
       class="chat-message-image-button"
       aria-label=${t("chat.imageLightbox.open", { title: this.label })}
-      @click=${() => this.onOpen?.(this.blobUrl!)}
+      @click=${() => this.onOpen?.(blobUrl)}
     >
       <img
-        src=${this.blobUrl}
+        src=${blobUrl}
         alt=${this.label}
         class="chat-message-image"
         @error=${this.handleImageError}

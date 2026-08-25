@@ -1267,8 +1267,7 @@ openclaw-chat-video-player {
   line-height: 1.2;
 }
 
-.chat-assistant-attachment-card__title,
-.chat-assistant-attachment-card__link {
+.chat-assistant-attachment-card__title {
   color: var(--text);
   font-size: 13px;
   font-weight: 600;
