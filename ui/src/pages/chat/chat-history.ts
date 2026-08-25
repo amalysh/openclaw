@@ -46,7 +46,6 @@ import {
   sleep,
 } from "./chat-history-retry.ts";
 import type { ChatRunStartupPhase } from "./chat-run-startup.ts";
-import { captureChatConnectionOwner } from "./chat-send-queue-state.ts";
 import type { ChatState } from "./chat-state-contract.ts";
 import { persistChatComposerState } from "./composer-persistence.ts";
 import {
@@ -1112,6 +1111,15 @@ type SwitchChatHistoryBranchState = ChatState &
     sessions: Pick<SessionCapability, "listBranches" | "switchBranch">;
   };
 
+function captureHistoryConnectionOwner(
+  state: Pick<ChatState, "client" | "connected" | "connectionEpoch">,
+): () => boolean {
+  const client = state.client;
+  const connectionEpoch = state.connectionEpoch;
+  return () =>
+    state.connected && state.client === client && state.connectionEpoch === connectionEpoch;
+}
+
 function hasAbortableChatSessionRun(state: ClearChatHistoryState): boolean {
   if (state.chatRunId) {
     return true;
@@ -1284,7 +1292,7 @@ export async function rewindChatHistory(
   }
   const sessionKey = state.sessionKey;
   const agentParams = scopedAgentParamsForSession(state, sessionKey);
-  const connectionIsCurrent = captureChatConnectionOwner(state);
+  const connectionIsCurrent = captureHistoryConnectionOwner(state);
   const viewIsCurrent = () =>
     connectionIsCurrent() && visibleSessionMatches(state, sessionKey, agentParams.agentId);
   try {
@@ -1337,7 +1345,7 @@ export async function switchChatHistoryBranch(
   }
   const sessionKey = state.sessionKey;
   const agentParams = scopedAgentParamsForSession(state, sessionKey);
-  const connectionIsCurrent = captureChatConnectionOwner(state);
+  const connectionIsCurrent = captureHistoryConnectionOwner(state);
   const viewIsCurrent = () =>
     connectionIsCurrent() && visibleSessionMatches(state, sessionKey, agentParams.agentId);
   try {
