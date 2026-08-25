@@ -59,7 +59,11 @@ import { normalizeProviderId } from "../agents/model-selection.js";
 import { shouldSuppressBuiltInModelCore } from "../agents/model-suppression.js";
 import { ensureOpenClawModelsJson } from "../agents/models-config.js";
 import { STREAM_ERROR_FALLBACK_TEXT } from "../agents/stream-message-shared.js";
-import { appendPrioritizedDynamicLiveModels } from "../agents/test-helpers/live-model-dynamic-candidates.js";
+import {
+  appendPrioritizedDynamicLiveModels,
+  applyLiveProviderPluginDiscoveryCompat,
+  resolveLiveProviderDiscoveryProviderIds,
+} from "../agents/test-helpers/live-model-dynamic-candidates.js";
 import { createLiveTargetMatcher } from "../agents/test-helpers/live-target-matcher.js";
 import { mergeWorkspaceSetupState } from "../agents/workspace-state-store.js";
 import { ensureAgentWorkspace } from "../agents/workspace.js";
@@ -191,12 +195,6 @@ function parseFilter(raw?: string): Set<string> | null {
   return ids.length ? new Set(ids) : null;
 }
 
-function providerFilterList(): string[] | undefined {
-  return PROVIDERS
-    ? [...PROVIDERS].toSorted((left, right) => left.localeCompare(right))
-    : undefined;
-}
-
 function listHighSignalLiveModelProviders(): string[] {
   return [...new Set(listPrioritizedHighSignalLiveModelRefs().map((ref) => ref.provider))].toSorted(
     (left, right) => left.localeCompare(right),
@@ -265,12 +263,13 @@ function filterGatewayLiveModelRefsByProvider(
 }
 
 function resolvePrioritizedGatewayLiveModelRefs(params: {
+  explicitRefs: readonly { provider: string; id: string }[];
   providerFilter: ReadonlySet<string> | null;
   useExplicit: boolean;
   useSmall: boolean;
 }): Array<{ provider: string; id: string }> {
   if (params.useExplicit) {
-    return [];
+    return filterGatewayLiveModelRefsByProvider(params.explicitRefs, params.providerFilter);
   }
   // High-signal refs can be plugin-resolved models absent from the static
   // catalog; omitting them leaves provider-scoped live lanes with zero coverage.
@@ -1488,7 +1487,7 @@ describe("resolveExplicitLiveModelCandidates", () => {
     expect(candidates).toEqual([model]);
   });
 
-  it("keeps provider-qualified explicit refs usable when the registry is empty", () => {
+  it("fails closed when canonical metadata is unavailable for an explicit ref", () => {
     const matcher = createLiveTargetMatcher({
       providerFilter: new Set(["openai"]),
       modelFilter: new Set(["openai/gpt-5.5"]),
@@ -1510,11 +1509,7 @@ describe("resolveExplicitLiveModelCandidates", () => {
       targetMatcher: matcher,
     });
 
-    if (!candidates) {
-      throw new Error("expected explicit fallback candidates");
-    }
-    expect(candidates).toEqual([createExplicitLiveFallbackModel("openai", "gpt-5.5")]);
-    expect(candidates[0]?.contextWindow).toBeGreaterThanOrEqual(4_000);
+    expect(candidates).toBeNull();
   });
 
   it("uses the Bedrock Converse API for explicit Bedrock fallback candidates", () => {
@@ -1630,6 +1625,7 @@ describe("providerScopedModelRegistryProviders", () => {
   it("loads provider-scoped dynamic refs for default high-signal sweeps", () => {
     expect(
       resolvePrioritizedGatewayLiveModelRefs({
+        explicitRefs: [],
         providerFilter: new Set(["openrouter"]),
         useExplicit: false,
         useSmall: false,
@@ -1641,6 +1637,7 @@ describe("providerScopedModelRegistryProviders", () => {
     ]);
     expect(
       resolvePrioritizedGatewayLiveModelRefs({
+        explicitRefs: [],
         providerFilter: new Set(["fireworks"]),
         useExplicit: false,
         useSmall: false,
@@ -1648,14 +1645,15 @@ describe("providerScopedModelRegistryProviders", () => {
     ).toEqual([{ provider: "fireworks", id: "accounts/fireworks/models/glm-5p1" }]);
   });
 
-  it("leaves explicit gateway model refs to targeted registry lookup", () => {
+  it("loads explicit gateway model refs through dynamic discovery", () => {
     expect(
       resolvePrioritizedGatewayLiveModelRefs({
+        explicitRefs: [{ provider: "openrouter", id: "openai/gpt-5.2-chat" }],
         providerFilter: new Set(["openrouter"]),
         useExplicit: true,
         useSmall: false,
       }),
-    ).toEqual([]);
+    ).toEqual([{ provider: "openrouter", id: "openai/gpt-5.2-chat" }]);
   });
 
   it("does not count small models outside a provider-scoped gateway sweep", () => {
@@ -4340,7 +4338,12 @@ function resolveExplicitLiveModelCandidates(params: {
     }
     const model =
       params.modelRegistry.find(ref.provider, ref.modelId) ??
-      createExplicitLiveFallbackModel(ref.provider, ref.modelId);
+      (ref.provider === "amazon-bedrock"
+        ? createExplicitLiveFallbackModel(ref.provider, ref.modelId)
+        : undefined);
+    if (!model) {
+      return null;
+    }
     if (
       !params.targetMatcher.matchesProvider(model.provider) ||
       !params.targetMatcher.matchesModel(model.provider, model.id)
@@ -5570,15 +5573,43 @@ describeLive("gateway live (dev agent, profile keys)", () => {
     "runs meaningful prompts across models with available keys",
     async () =>
       await withSuppressedGatewayLiveWarnings(async () => {
-        const providerList = providerFilterList();
+        const rawModels = await resolveGatewayLiveRequestedModels();
+        const useModern = !rawModels || rawModels === "modern" || rawModels === "all";
+        const useSmall = rawModels === "small";
+        const useExplicit = Boolean(rawModels) && !useModern && !useSmall;
+        const filter = useExplicit ? parseFilter(rawModels) : null;
+        const explicitRefs = useExplicit
+          ? [...(filter ?? [])].flatMap((raw) => {
+              const ref = parseExplicitLiveModelRef(raw, PROVIDERS);
+              return ref ? [{ provider: ref.provider, id: ref.modelId }] : [];
+            })
+          : [];
+        const priorityRefs = filterGatewayLiveModelRefsByProvider(
+          useExplicit
+            ? explicitRefs
+            : useSmall
+              ? listPrioritizedSmallLiveModelRefs()
+              : listPrioritizedHighSignalLiveModelRefs(),
+          PROVIDERS,
+        );
+        const providerList = resolveLiveProviderDiscoveryProviderIds({
+          providerFilter: PROVIDERS,
+          explicitRefs,
+          priorityRefs,
+        });
         const providerLog = providerList?.join(",") ?? "all";
         logProgress(`[all-models] discover candidates providers=${providerLog}`);
         logProgress("[all-models] loading config");
         clearRuntimeConfigSnapshot();
-        const cfg = await withGatewayLiveSetupTimeout(
+        const loadedCfg = await withGatewayLiveSetupTimeout(
           readLiveTestConfig(),
           "[all-models] load config",
         );
+        const cfg = applyLiveProviderPluginDiscoveryCompat({
+          config: loadedCfg,
+          providers: providerList,
+          env: process.env,
+        });
         const workspaceDir = resolveAgentWorkspaceDir(cfg, DEFAULT_AGENT_ID);
         logProgress("[all-models] preparing models.json");
         const modelsJsonResult = await withGatewayLiveSetupTimeout(
@@ -5589,12 +5620,6 @@ describeLive("gateway live (dev agent, profile keys)", () => {
           "[all-models] prepare models.json",
         );
         const agentDir = modelsJsonResult.agentDir;
-
-        const rawModels = await resolveGatewayLiveRequestedModels();
-        const useModern = !rawModels || rawModels === "modern" || rawModels === "all";
-        const useSmall = rawModels === "small";
-        const useExplicit = Boolean(rawModels) && !useModern && !useSmall;
-        const filter = useExplicit ? parseFilter(rawModels) : null;
         const providerScopedModelProviders = providerScopedModelRegistryProviders({
           providerList,
           useSmall,
@@ -5632,6 +5657,7 @@ describeLive("gateway live (dev agent, profile keys)", () => {
           all = authBacked.all;
         }
         const prioritizedRefs = resolvePrioritizedGatewayLiveModelRefs({
+          explicitRefs,
           providerFilter: PROVIDERS,
           useExplicit,
           useSmall,
