@@ -27,8 +27,7 @@ describe("groupCatalogSessionsByProject", () => {
       session("b-2", "/work/bravo"),
     ]);
 
-    expect(result.groups.map((group) => group.key)).toEqual(["/work/bravo", "/work/alpha"]);
-    expect(result.groups.map((group) => group.renderKey)).toEqual([
+    expect(result.groups.map((group) => group.key)).toEqual([
       "project:/work/bravo",
       "project:/work/alpha",
     ]);
@@ -45,8 +44,8 @@ describe("groupCatalogSessionsByProject", () => {
     expect(result.groups).toMatchObject([
       { key: "custom:Release", label: "Release", sessions: [{ threadId: "grouped" }] },
       {
-        key: "/work/openclaw",
-        renderKey: "project:/work/openclaw",
+        key: "project:/work/openclaw",
+        legacySectionKey: "/work/openclaw",
         label: "openclaw",
         sessions: [{ threadId: "project" }],
       },
@@ -59,7 +58,10 @@ describe("groupCatalogSessionsByProject", () => {
       { ...session("grouped", "/work/openclaw"), customGroup: "Release" },
     ]);
 
-    expect(result.groups.map((group) => group.key)).toEqual(["custom:Release", "/work/openclaw"]);
+    expect(result.groups.map((group) => group.key)).toEqual([
+      "custom:Release",
+      "project:/work/openclaw",
+    ]);
   });
 
   it("keeps custom groups separate from project paths with the same key text", () => {
@@ -69,10 +71,10 @@ describe("groupCatalogSessionsByProject", () => {
     ]);
 
     expect(result.groups).toMatchObject([
-      { key: "custom:repo", renderKey: "custom:repo", sessions: [{ threadId: "grouped" }] },
+      { key: "custom:repo", sessions: [{ threadId: "grouped" }] },
       {
-        key: "custom:repo",
-        renderKey: "project:custom:repo",
+        key: "project:custom:repo",
+        legacySectionKey: "custom:repo",
         sessions: [{ threadId: "project" }],
       },
     ]);
@@ -89,7 +91,7 @@ describe("groupCatalogSessionsByProject", () => {
     ]);
 
     expect(result.groups).toHaveLength(1);
-    expect(result.groups[0]?.key).toBe(expectedProject);
+    expect(result.groups[0]?.key).toBe(`project:${expectedProject}`);
     expect(result.groups[0]?.sessions.map((item) => item.threadId)).toEqual(["direct", "worktree"]);
   });
 
@@ -110,8 +112,8 @@ describe("groupCatalogSessionsByProject", () => {
     const result = groupCatalogSessionsByProject([session("one", cwd)]);
 
     expect(result.groups[0]).toMatchObject({
-      key: expectedPath,
-      renderKey: `project:${expectedPath}`,
+      key: `project:${expectedPath}`,
+      legacySectionKey: expectedPath,
       label: expectedLabel,
       title: expectedPath,
     });

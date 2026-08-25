@@ -405,19 +405,27 @@ function renderCatalogHostGroup(
         ${projectGroups
           ? html`${repeat(
               projectGroups.groups,
-              (group) => group.renderKey,
+              (group) => group.key,
               (group) => {
-                const sectionId = `catalog-project:${catalog.id}:${host.hostId}:${group.key}`;
-                const collapsed = params.collapsedSections.has(sectionId);
+                const sectionId = `catalog-${group.kind}:${catalog.id}:${host.hostId}:${group.key}`;
+                const legacySectionId = group.legacySectionKey
+                  ? `catalog-project:${catalog.id}:${host.hostId}:${group.legacySectionKey}`
+                  : null;
+                const collapsedSectionId = params.collapsedSections.has(sectionId)
+                  ? sectionId
+                  : legacySectionId && params.collapsedSections.has(legacySectionId)
+                    ? legacySectionId
+                    : null;
+                const collapsed = collapsedSectionId !== null;
                 return html`
                   <div class="sidebar-session-catalog-project" role="listitem">
                     <button
                       type="button"
                       class="sidebar-session-catalog-project__head"
-                      data-session-catalog-project=${group.renderKey}
+                      data-session-catalog-project=${group.key}
                       aria-expanded=${String(!collapsed)}
                       title=${group.title}
-                      @click=${() => params.onToggleSection(sectionId)}
+                      @click=${() => params.onToggleSection(collapsedSectionId ?? sectionId)}
                     >
                       <span class="sidebar-session-catalog-project__icon" aria-hidden="true"
                         >${collapsed ? icons.chevronRight : icons.chevronDown}</span

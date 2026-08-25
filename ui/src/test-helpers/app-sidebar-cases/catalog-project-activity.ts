@@ -7,7 +7,7 @@ describe("AppSidebar project session activity", () => {
   it("preserves collapsed project sections stored by earlier versions", async () => {
     localStorage.setItem(
       "openclaw:sidebar:sessions:collapsed-sections",
-      JSON.stringify(["catalog-project:codex:gateway:local:/work/openclaw"]),
+      JSON.stringify(["catalog-project:codex:gateway:local:custom:repo"]),
     );
     const gateway = createGateway({} as GatewayBrowserClient);
     const { sidebar } = await mountSidebar(gateway, createSessions("main", ["agent:main:main"]));
@@ -24,9 +24,18 @@ describe("AppSidebar project session activity", () => {
             connected: true,
             sessions: [
               {
-                threadId: "legacy-collapsed-thread",
-                name: "Collapsed session",
-                cwd: "/work/openclaw",
+                threadId: "custom-group-thread",
+                name: "Custom group session",
+                customGroup: "repo",
+                status: "idle",
+                archived: false,
+                canContinue: true,
+                canArchive: true,
+              },
+              {
+                threadId: "legacy-project-thread",
+                name: "Legacy collapsed project",
+                cwd: "custom:repo",
                 status: "idle",
                 archived: false,
                 canContinue: true,
@@ -40,11 +49,22 @@ describe("AppSidebar project session activity", () => {
     sidebar.sessionData.requestSessionDataUpdate();
     await sidebar.updateComplete;
 
-    const project = sidebar.querySelector<HTMLButtonElement>(
-      ".sidebar-session-catalog-project__head",
+    const customGroup = sidebar.querySelector<HTMLButtonElement>(
+      '[data-session-catalog-project="custom:repo"]',
     );
+    const project = sidebar.querySelector<HTMLButtonElement>(
+      '[data-session-catalog-project="project:custom:repo"]',
+    );
+    expect(customGroup?.getAttribute("aria-expanded")).toBe("true");
     expect(project?.getAttribute("aria-expanded")).toBe("false");
-    expect(sidebar.querySelector('[data-session-key*="legacy-collapsed-thread"]')).toBeNull();
+    expect(sidebar.querySelector('[data-session-key*="custom-group-thread"]')).not.toBeNull();
+    expect(sidebar.querySelector('[data-session-key*="legacy-project-thread"]')).toBeNull();
+
+    project?.click();
+    await sidebar.updateComplete;
+    expect(
+      JSON.parse(localStorage.getItem("openclaw:sidebar:sessions:collapsed-sections") ?? "[]"),
+    ).not.toContain("catalog-project:codex:gateway:local:custom:repo");
   });
 
   it("preserves catalog menu focus when project groups reorder", async () => {

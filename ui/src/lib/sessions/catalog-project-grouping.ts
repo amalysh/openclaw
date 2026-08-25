@@ -7,10 +7,11 @@ export function normalizeCatalogProjectGrouping(raw: unknown): CatalogProjectGro
 }
 
 type CatalogProjectGroup = {
-  // `key` is part of the persisted collapsed-section id. `renderKey` may add a
-  // namespace so Lit never reuses a custom group for a same-text project path.
+  kind: "custom" | "project" | "person";
   key: string;
-  renderKey: string;
+  // Project collapse ids predate namespaced group keys. Read the old suffix
+  // until the next toggle migrates that section to its canonical id.
+  legacySectionKey?: string;
   label: string;
   title: string;
   sessions: SessionCatalogSession[];
@@ -36,8 +37,8 @@ export function groupCatalogSessionsByProject(sessions: readonly SessionCatalogS
       let group = customGroupsByName.get(customGroup);
       if (!group) {
         group = {
+          kind: "custom",
           key,
-          renderKey: key,
           label: customGroup,
           title: `Custom group: ${customGroup}`,
           sessions: [],
@@ -66,8 +67,9 @@ export function groupCatalogSessionsByProject(sessions: readonly SessionCatalogS
     let group = projectGroupsByPath.get(projectPath);
     if (!group) {
       group = {
-        key: projectPath,
-        renderKey: `project:${projectPath}`,
+        kind: "project",
+        key: `project:${projectPath}`,
+        legacySectionKey: projectPath,
         label: projectPath.split(/[\\/]/).at(-1) || projectPath,
         title: projectPath,
         sessions: [],
@@ -101,7 +103,7 @@ export function groupCatalogSessionsByPerson(sessions: readonly SessionCatalogSe
     let group = groupsById.get(key);
     if (!group) {
       const label = actor.label?.trim() || actor.id;
-      group = { key, renderKey: key, label, title: `Created by ${label}`, sessions: [] };
+      group = { kind: "person", key, label, title: `Created by ${label}`, sessions: [] };
       groupsById.set(key, group);
     }
     group.sessions.push(session);
