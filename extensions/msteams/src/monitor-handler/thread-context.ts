@@ -130,15 +130,9 @@ export async function resolveMSTeamsThreadContext(params: {
   }
 
   let threadContext: string | undefined;
-  // Channel activities frequently arrive without `replyToId`, so fall back to the thread
-  // root carried in the conversation id; without it, parent and sibling-reply context
-  // never loads for those turns.
-  //
-  // The conversation root takes precedence, matching `resolveMSTeamsRouteSessionKey` and
-  // `attachments/graph.ts`, which both read `conversationMessageId` ahead of `replyToId`.
-  // Preferring `replyToId` here would make a deep reply fetch context beneath the nested
-  // reply while the session routes to the root, splitting the two. `replyToId` stays as
-  // the fallback for activities whose conversation id carries no thread suffix.
+  // Channel activities often omit `replyToId`; the thread root still rides in the conversation
+  // id. Root-first matches `resolveMSTeamsRouteSessionKey` and `attachments/graph.ts`, so a deep
+  // reply's context cannot diverge from its session. `replyToId` stays as the fallback.
   const threadRootId = conversationMessageId ?? activity.replyToId;
   const threadParentId = threadRootId && threadRootId !== activity.id ? threadRootId : undefined;
   if (threadParentId && params.isChannel && teamAadGroupId) {
