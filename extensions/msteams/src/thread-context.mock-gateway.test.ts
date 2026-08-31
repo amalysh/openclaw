@@ -14,13 +14,13 @@
  * Assertions are on the Graph requests this process issues for a channel activity delivered
  * without `replyToId`. Before the repair that set is empty.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { OpenClawConfig } from "../runtime-api.js";
 import { type MSTeamsActivityHandler, registerMSTeamsHandlers } from "./monitor-handler.js";
 import {
   createMSTeamsMessageHandlerDeps,
   installMSTeamsTestRuntime,
 } from "./monitor-handler.test-helpers.js";
-import type { OpenClawConfig } from "./runtime-api.js";
 import type { MSTeamsTurnContext } from "./sdk-types.js";
 
 const CHANNEL_CONVERSATION_ID = "19:general@thread.tacv2";
@@ -32,6 +32,15 @@ const graphJson = (body: unknown) =>
     status: 200,
     headers: { "content-type": "application/json" },
   });
+
+const realFetch = globalThis.fetch;
+
+// Restore the ambient fetch after every case. Without this the stub leaks into sibling
+// suites in the same worker — the QA Bot Framework server tests start seeing 200 for
+// requests they expect to fail.
+afterEach(() => {
+  globalThis.fetch = realFetch;
+});
 
 /** Answers the two Graph thread reads and records every request the process issues. */
 function installGraphFetchMock() {
@@ -128,6 +137,7 @@ describe("msteams channel thread context mock-gateway proof", () => {
           conversationType: "channel",
         },
       }),
+      async () => undefined,
     );
 
     const urls = graphUrls(fetchMock);
@@ -166,6 +176,7 @@ describe("msteams channel thread context mock-gateway proof", () => {
           conversationType: "channel",
         },
       }),
+      async () => undefined,
     );
 
     expect(
