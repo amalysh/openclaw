@@ -45,7 +45,7 @@ afterEach(() => {
 /** Answers the two Graph thread reads and records every request the process issues. */
 function installGraphFetchMock() {
   const impl = vi.fn(async (input: unknown) => {
-    const url = typeof input === "string" ? input : String((input as { url?: string })?.url ?? "");
+    const url = typeof input === "string" ? input : ((input as { url?: string })?.url ?? "");
     if (url.includes(`/messages/${THREAD_ROOT_ID}/replies`)) {
       return graphJson({
         value: [
@@ -73,7 +73,7 @@ function installGraphFetchMock() {
 function graphUrls(impl: ReturnType<typeof installGraphFetchMock>) {
   return impl.mock.calls
     .map(([input]) =>
-      typeof input === "string" ? input : String((input as { url?: string })?.url ?? ""),
+      typeof input === "string" ? input : ((input as { url?: string })?.url ?? ""),
     )
     .filter((url) => url.includes("graph.microsoft.com"));
 }
