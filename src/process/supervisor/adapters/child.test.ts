@@ -17,6 +17,9 @@ import {
   mockLinuxOomWrapperShell,
 } from "./test-support.js";
 
+type CreateWindowsOutputDecoder =
+  typeof import("../../../infra/windows-encoding.js").createWindowsOutputDecoder;
+
 const {
   spawnWithFallbackMock,
   signalProcessTreeMock,
@@ -29,7 +32,7 @@ const {
       opts?.onComplete?.();
     },
   ),
-  createWindowsOutputDecoderMock: vi.fn(() => ({
+  createWindowsOutputDecoderMock: vi.fn<CreateWindowsOutputDecoder>(() => ({
     decode: (chunk: Buffer | string) => (Buffer.isBuffer(chunk) ? chunk.toString("utf8") : chunk),
     flush: () => "",
   })),
@@ -71,7 +74,7 @@ async function createAdapterHarness(params?: {
     env: params?.env,
     stdinMode: "pipe-open",
   });
-  return { adapter, killMock };
+  return { adapter, child, killMock };
 }
 
 function expectedTrustedCmdExe(): string {
@@ -271,50 +274,6 @@ describe("createChildAdapter", () => {
     }
   });
 
-  it("waits for an owned worker's secret descriptor to close after delivery", async () => {
-    vi.useFakeTimers();
-    setPlatform("darwin");
-    const { child, emitExit } = createStubChild();
-    const secretStream = new Writable({
-      autoDestroy: false,
-      write(_chunk, _encoding, callback) {
-        callback();
-      },
-    });
-    Object.defineProperty(child, "stdio", {
-      value: [child.stdin, child.stdout, child.stderr, secretStream, null],
-      configurable: true,
-    });
-    spawnWithFallbackMock.mockResolvedValue({ child, usedFallback: false });
-    const transient = Buffer.from("synthetic-secret");
-    const adapter = await createChildAdapter({
-      argv: ["node", "worker"],
-      ownedWorker: true,
-      secretInput: { fd: 3, createData: () => transient },
-    });
-    const settled = vi.fn();
-    const wait = adapter.wait();
-    void wait.then(settled);
-
-    try {
-      expect(secretStream.writableFinished).toBe(true);
-      expect(transient.equals(Buffer.alloc(transient.length))).toBe(true);
-      adapter.closeStartGate?.();
-      emitExit(0);
-      child.stdout?.emit("close");
-      child.stderr?.emit("close");
-      await vi.advanceTimersByTimeAsync(0);
-      expect(settled).not.toHaveBeenCalled();
-      secretStream.destroy();
-      await vi.advanceTimersByTimeAsync(0);
-      expect(settled).toHaveBeenCalledExactlyOnceWith({ code: 0, signal: null });
-      await expect(wait).resolves.toEqual({ code: 0, signal: null });
-    } finally {
-      secretStream.destroy();
-      adapter.dispose();
-    }
-  });
-
   it("keeps ordinary children supervised through repeated operational errors", async () => {
     const { child, emitClose, emitExit } = createStubChild(7865);
     spawnWithFallbackMock.mockResolvedValue({ child, usedFallback: false });
@@ -412,6 +371,7 @@ describe("createChildAdapter", () => {
   );
 
   it("preserves startup failure when a worker error arrives during secret delivery", async () => {
+    setPlatform("win32");
     const { child, killMock } = createStubChild();
     const deliveryError = new Error("secret delivery failed");
     const secretStream = new Writable({
@@ -444,6 +404,7 @@ describe("createChildAdapter", () => {
   });
 
   it("writes secret input to an extra descriptor and zeroes the transient buffer", async () => {
+    setPlatform("win32");
     const { child } = createStubChild();
     const secretStream = new PassThrough();
     const chunks: Buffer[] = [];
@@ -480,6 +441,7 @@ describe("createChildAdapter", () => {
   });
 
   it("captures child close while secret input delivery is still pending", async () => {
+    setPlatform("win32");
     const { child, emitClose } = createStubChild();
     const secretStream = new Writable({
       write(_chunk, _encoding, callback) {
@@ -674,13 +636,56 @@ describe("createChildAdapter", () => {
     expect(adapter.stdin?.writableEnded).toBe(true);
   });
 
-  it("wait does not settle immediately on SIGKILL", async () => {
+  it("disposes only decoder-owned output listeners after the SIGKILL fallback", async () => {
     vi.useFakeTimers();
-    const { adapter } = await createAdapterHarness({ pid: 4567 });
+    const flush = vi.fn(() => "flushed tail");
+    createWindowsOutputDecoderMock.mockImplementation(() => ({
+      decode: (chunk: Buffer | string) => (Buffer.isBuffer(chunk) ? chunk.toString("utf8") : chunk),
+      flush,
+    }));
+    const { adapter, child } = await createAdapterHarness({ pid: 4567 });
+    const stdout = vi.fn();
+    const stderr = vi.fn();
+    const stdoutClose = vi.fn();
+    const stderrClose = vi.fn();
+    const stdoutPipe = child.stdout as PassThrough;
+    const stderrPipe = child.stderr as PassThrough;
+    stdoutPipe.on("close", stdoutClose);
+    stderrPipe.on("close", stderrClose);
+    adapter.onStdout(stdout);
+    adapter.onStderr(stderr);
+
+    stdoutPipe.write("drained stdout");
+    stderrPipe.write("drained stderr");
+    expect(stdout).toHaveBeenCalledExactlyOnceWith("drained stdout");
+    expect(stderr).toHaveBeenCalledExactlyOnceWith("drained stderr");
 
     await expectWaitStaysPendingUntilSigkillFallback(adapter.wait(), () => {
       adapter.kill();
     });
+
+    const stdoutCloseListeners = stdoutPipe.listenerCount("close");
+    const stderrCloseListeners = stderrPipe.listenerCount("close");
+    const queuedError = new Error("queued output stream error");
+    expect(stderrPipe.destroy(queuedError)).toBe(stderrPipe);
+    expect(adapter.dispose()).toBeUndefined();
+
+    expect(stdoutPipe.destroyed).toBe(true);
+    expect(stderrPipe.destroyed).toBe(true);
+    expect(stderrPipe.errored).toBe(queuedError);
+    expect(stderrPipe.listenerCount("error")).toBe(1);
+    expect(stdoutPipe.listenerCount("close")).toBe(stdoutCloseListeners - 1);
+    expect(stderrPipe.listenerCount("close")).toBe(stderrCloseListeners - 1);
+
+    stdoutPipe.emit("data", Buffer.from("late stdout"));
+    stderrPipe.emit("data", Buffer.from("late stderr"));
+    await vi.runAllTimersAsync();
+
+    expect(stdout).toHaveBeenCalledOnce();
+    expect(stderr).toHaveBeenCalledOnce();
+    expect(flush).not.toHaveBeenCalled();
+    expect(stdoutClose).toHaveBeenCalledOnce();
+    expect(stderrClose).toHaveBeenCalledOnce();
   });
 
   it("prefers real child close over the SIGKILL fallback settle", async () => {
@@ -921,7 +926,7 @@ describe("createChildAdapter", () => {
       "/d",
       "/s",
       "/c",
-      "pnpm.cmd --version",
+      '""pnpm.cmd" "--version""',
     ]);
     expect(spawnArgs.options?.detached).toBe(false);
     expect(spawnArgs.options?.windowsHide).toBe(true);

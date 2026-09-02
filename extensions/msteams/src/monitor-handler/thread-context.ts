@@ -80,8 +80,8 @@ export function prepareMSTeamsThreadRouting(params: {
 
   return {
     route,
+    threadRootId: params.conversationMessageId ?? params.context.activity.replyToId,
     deadline,
-    conversationMessageId: params.conversationMessageId,
     resolveTeamAadGroupId,
     getTeamAadGroupId: () => teamAadGroupId,
   };
@@ -103,7 +103,7 @@ export async function resolveMSTeamsThreadContext(params: {
 }) {
   const core = getMSTeamsRuntime();
   const activity = params.context.activity;
-  const { route, deadline, conversationMessageId } = params.routing;
+  const { route, deadline } = params.routing;
   const teamAadGroupId = await params.routing.resolveTeamAadGroupId();
   let quoteBodyFull: string | undefined;
   let quoteSenderId: string | undefined;
@@ -130,12 +130,9 @@ export async function resolveMSTeamsThreadContext(params: {
   }
 
   let threadContext: string | undefined;
-  // Channel activities often omit `replyToId`; the thread root still rides in the conversation
-  // id. Root-first matches `resolveMSTeamsRouteSessionKey` and `attachments/graph.ts`, so a deep
-  // reply's context cannot diverge from its session. `replyToId` stays as the fallback.
-  const threadRootId = conversationMessageId ?? activity.replyToId;
-  const threadParentId = threadRootId && threadRootId !== activity.id ? threadRootId : undefined;
-  if (threadParentId && params.isChannel && teamAadGroupId) {
+  // Use the same root as session routing; Teams can omit replyToId on replies.
+  const threadParentId = params.routing.threadRootId;
+  if (threadParentId && threadParentId !== activity.id && params.isChannel && teamAadGroupId) {
     try {
       const graphToken = await withMSTeamsRequestDeadline({
         deadline,
